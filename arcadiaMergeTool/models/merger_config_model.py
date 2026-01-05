@@ -1,5 +1,4 @@
-from typing import Any, List
-from pydantic import BaseModel, ConfigDict, Field, constr
+from pydantic import BaseModel, ConfigDict
 
 from arcadiaMergeTool.models.config_project_model import ConfigProjectModel
 
@@ -10,5 +9,6 @@ class MergerConfigModel(BaseModel):
     baseModel: ConfigProjectModel
     basePath: str
     infoPath: str
+    name: str
     
 
