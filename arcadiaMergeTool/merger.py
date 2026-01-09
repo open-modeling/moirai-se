@@ -286,23 +286,20 @@ def mergeRplElement(sourceElement: ModelElement, origin: re.CatalogElementLink, 
     # in destination model, all others will be delivered based on the components internal structure
     prj: capellambse.metamodel.capellamodeller.Project = dest.model.project
 
-    def nearestMatcher (x: ModelElement):
-        return x.name == sourceElement.name and x.parent.name == sourceElement.parent.name  # pyright: ignore[reportAttributeAccessIssue] name is a legal attribute in this context
-
     # use nearest match by name, it is more or less safe in case of the replicas, usually nobody takes care to rename imported elements
-    nearestMatch = list(filter(nearestMatcher , dest.model.search(sourceElement.__class__, below = prj.model_root)))
+    nearestMatch = list(filter(lambda x: x.name == sourceElement.name and x.parent.name == sourceElement.parent.name, dest.model.search(sourceElement.__class__, below = prj.model_root))) # pyright: ignore[reportAttributeAccessIssue] name is a legal attribute in this context
 
     if len(nearestMatch) == 0:
         LOGGER.debug(f"[{mergeRplElement.__name__}] no matching element found for [%s] uuid [%s] class [%s], append to the model", sourceElement.name, sourceElement.uuid, sourceElement.__class__)
     
         # assume it's safe to search for the nearest match by class and find only one root using two step lookup - by layer and then by parent
-        nearestDestLayert = dest.model.search(sourceElement.layer.__class__, below = prj.model_root).pop()
-        nearestDestParents = dest.model.search(sourceElement.parent.__class__, below = nearestDestLayert)
+        nearestDestLayer = dest.model.search(sourceElement.layer.__class__, below = prj.model_root).pop()
+        nearestDestParents = dest.model.search(sourceElement.parent.__class__, below = nearestDestLayer)
         nearestDestParent = None
         if len(nearestDestParents) == 1:
             nearestDestParent = nearestDestParents.pop()
         elif len(nearestDestParents) > 1:
-            nearestDestParent = list(filter(nearestMatcher, nearestDestParents)).pop()
+            nearestDestParent = list(filter(lambda x: x.name == sourceElement.parent.name and x.parent.name == sourceElement.parent.parent.name, nearestDestParents)).pop() # pyright: ignore[reportAttributeAccessIssue] name is a legal attribute in this context
         else:
             LOGGER.fatal(f"[{mergeRplElement.__name__}] impossible case, no nearest parent found for [%s] uuid [%s] class [%s], append to the model", sourceElement.name, sourceElement.uuid, sourceElement.__class__)
             exit(str(ExitCodes.MergeFault))
