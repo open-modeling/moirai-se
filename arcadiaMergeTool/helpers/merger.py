@@ -32,10 +32,10 @@ def mergeLibraries(
     cache: dict[str, bool] = {}
 
     LOGGER.info(
-        f"[{mergeLibraries.__name__}] begin merging libraries into target model"
+        f"[{mergeLibraries.__qualname__}] begin merging libraries into target model"
     )
 
-    """assume it's safe operation"""
+    # assume it's safe to merge libraries into the first ModelInfo extension
     dst_ext: capellambse.model.ModelElement = dest.model.project.extensions[0]
 
     for ext in dest.model.project.extensions:
@@ -49,7 +49,7 @@ def mergeLibraries(
                         ext.references.remove(ref)
                 except Exception as e:
                     LOGGER.warning(
-                        f"[{mergeLibraries.__name__}] library for refererence [%s] is not initialized, remove from model [%r]",
+                        f"[{mergeLibraries.__qualname__}] library for refererence [%s] is not initialized, remove from model [%r]",
                         ref.uuid,
                         e,
                     )
@@ -68,14 +68,11 @@ def mergeLibraries(
                     if lib and not cache.get(lib.uuid):
                         name = lib.parent.name  # pyright: ignore[reportAttributeAccessIssue] name is a valid attribute here
                         LOGGER.debug(
-                            f"[{mergeLibraries.__name__}] adding new library [%s]", name
+                            f"[{mergeLibraries.__qualname__}] adding new library [%s]",
+                            name,
                         )
 
                         """in case of library is not loaded, link it"""
-                        print(lib._model)
-                        print(proj.extensions[0].references)
-                        print(proj.extensions[0].references)
-                        # print(dest.model.project.extensions[0].references.library)
                         dest.model._loader._link_library(
                             PurePosixPath("product-configuration")
                         )
@@ -120,7 +117,7 @@ def mergeExtensions(
     3. all referenced elements are aligned with target libraries and created empty in target model (to be completed later)
     """
     LOGGER.info(
-        f"[{mergeExtensions.__name__}] begin merging model catalogs into target model"
+        f"[{mergeExtensions.__qualname__}] begin merging model catalogs into target model"
     )
 
     extensionsMap: dict[str, tuple[re.RecCatalog, dict[str, re.CatalogElement]]] = {}
@@ -147,7 +144,7 @@ def mergeExtensions(
     for ext in dest.model.project.model_root.extensions:
         if isinstance(ext, re.RecCatalog):
             LOGGER.debug(
-                f"[{mergeExtensions.__name__}] Cache: REC Catalog [%s] found in target model, record contents",
+                f"[{mergeExtensions.__qualname__}] Cache: REC Catalog [%s] found in target model, record contents",
                 ext.uuid,
             )
 
@@ -159,7 +156,7 @@ def mergeExtensions(
                 if isinstance(elem, re.CatalogElement):
                     if elem.kind == re.CatalogElementKind.RPL:
                         LOGGER.debug(
-                            f"[{mergeExtensions.__name__}] Cache: catalog with uuid [%s]",
+                            f"[{mergeExtensions.__qualname__}] Cache: catalog with uuid [%s]",
                             elem.uuid,
                         )
                         # refer to origin uuid, as long as it points to the stable ID in the source library
@@ -180,12 +177,12 @@ def mergeExtensions(
                                 if origin is not None and target is not None:
                                     catalogEntry[origin.uuid] = link
 
-                                    cacheOriginKey = (origin._model.uuid, origin.uuid)
-                                    elementsMappingMap[cacheOriginKey] = target
+                                    cacheOriginKey = (origin.source.uuid, origin.uuid) # pyright: ignore[reportOptionalMemberAccess] expect origin already exists in the model
+                                    elementsMappingMap[cacheOriginKey] = (target, True)
                                 else:
                                     # stop merge on broken libraries
                                     LOGGER.fatal(
-                                        f"[{mergeExtensions.__name__}] Cache: catalog link [%s] points to broken entities, origin state is [%s], target state is [%s]",
+                                        f"[{mergeExtensions.__qualname__}] Cache: catalog link [%s] points to broken entities, origin state is [%s], target state is [%s]",
                                         link.uuid,
                                         origin is None,
                                         target is None,
@@ -193,24 +190,24 @@ def mergeExtensions(
                                     exit(str(ExitCodes.MergeFault))
                         else:
                             LOGGER.warning(
-                                f"[{mergeExtensions.__name__}] Cache: unknown catalog element [%s] does not have origin",
+                                f"[{mergeExtensions.__qualname__}] Cache: unknown catalog element [%s] does not have origin",
                                 elem.uuid,
                             )
                     else:
                         LOGGER.warning(
-                            f"[{mergeExtensions.__name__}] Cache: skip merge of catalog element [%s] of kind [%s]",
+                            f"[{mergeExtensions.__qualname__}] Cache: skip merge of catalog element [%s] of kind [%s]",
                             elem.uuid,
                             elem.kind,
                         )
                 else:
                     LOGGER.warning(
-                        f"[{mergeExtensions.__name__}] Cache: unknown catalog element [%s] detacted in target model extension [%s]",
+                        f"[{mergeExtensions.__qualname__}] Cache: unknown catalog element [%s] detacted in target model extension [%s]",
                         elem.uuid,
                         ext.name,
                     )
         else:
             LOGGER.warning(
-                f"[{mergeExtensions.__name__}] Cache: unknown extension [%s] detacted in target model",
+                f"[{mergeExtensions.__qualname__}] Cache: unknown extension [%s] detacted in target model",
                 ext.name,
             )
 
@@ -220,7 +217,7 @@ def mergeExtensions(
 
     for model in src:
         LOGGER.debug(
-            f"[{mergeExtensions.__name__}] Merge: process model [%s], [%s]",
+            f"[{mergeExtensions.__qualname__}] Merge: process model [%s], [%s]",
             model.model.name,
             model.model.uuid,
         )
@@ -228,7 +225,7 @@ def mergeExtensions(
         for ext in extensions:
             if isinstance(ext, re.RecCatalog):
                 LOGGER.debug(
-                    f"[{mergeExtensions.__name__}] Merge: REC Catalog [%s] found in source model [%s], record contents",
+                    f"[{mergeExtensions.__qualname__}] Merge: REC Catalog [%s] found in source model [%s], record contents",
                     ext.uuid,
                     model.model.name,
                 )
@@ -247,7 +244,7 @@ def mergeExtensions(
                             # at present only RPLs are considered, other extension types are logged, but ignored
                             # TODO: refactor this code to extract merger into specialized function
                             LOGGER.debug(
-                                f"[{mergeExtensions.__name__}] Merge: catalog with uuid [%s]",
+                                f"[{mergeExtensions.__qualname__}] Merge: catalog with uuid [%s]",
                                 elem.uuid,
                             )
 
@@ -278,7 +275,7 @@ def mergeExtensions(
                                         )
                                         destExtensionsMap[source.uuid] = element
                                         LOGGER.debug(
-                                            f"[{mergeExtensions.__name__}] Merge: created new extension element [%s] with uuid [%s], origin [%s] with uuid [%s]",
+                                            f"[{mergeExtensions.__qualname__}] Merge: created new extension element [%s] with uuid [%s], origin [%s] with uuid [%s]",
                                             element.name,
                                             element.uuid,
                                             origin.name,
@@ -286,7 +283,7 @@ def mergeExtensions(
                                         )
                                     except Exception as ex:
                                         LOGGER.fatal(
-                                            f"[{mergeExtensions.__name__}] Merge: can't copy RPL into target model",
+                                            f"[{mergeExtensions.__qualname__}] Merge: can't copy RPL into target model",
                                             ex,
                                         )
                                         exit(str(ExitCodes.MergeFault))
@@ -301,7 +298,7 @@ def mergeExtensions(
                                     if not isSane:
                                         LOGGER.error(
                                             (
-                                                f"[{mergeExtensions.__name__}] Merge: Source and Target RPLs are not the same target [%s], [%s]",
+                                                f"[{mergeExtensions.__qualname__}] Merge: Source and Target RPLs are not the same target [%s], [%s]",
                                                 targetElem,
                                                 source,
                                             )
@@ -321,8 +318,10 @@ def mergeExtensions(
 
                                 for link in elem.links:
                                     LOGGER.debug(
-                                        f"[{mergeExtensions.__name__}] Merge: Processing catalog element link [%s]",
+                                        f"[{mergeExtensions.__qualname__}] Merge: Processing catalog element link [%s], model [%s], uuid [%s]",
                                         link.uuid,
+                                        link._model.name,
+                                        link._model.uuid,
                                     )
 
                                     # assume all missing cache does not really exists and it's safe to add more links
@@ -335,7 +334,7 @@ def mergeExtensions(
                                         # this adds certain degree of confidence that resulting model contains correctly copied elements
                                         # target = _model.by_uuid(str(link.target.uuid))
                                         target = mergeRplElement(
-                                            link.target, # pyright: ignore[reportArgumentType, reportOptionalMemberAccess] expect target already exists in the model
+                                            link.target,  # pyright: ignore[reportArgumentType, reportOptionalMemberAccess] expect target already exists in the model
                                             link.origin,  # pyright: ignore[reportArgumentType, reportOptionalMemberAccess] expect target already exists in the model
                                             dest,
                                             base,
@@ -349,27 +348,33 @@ def mergeExtensions(
                                             target=target,
                                         )
                                         catalogEntry[origin.uuid] = newLink
+                                    else:
+                                        elementsMappingMap[
+                                            (link.target._model.uuid, link.target.uuid) # pyright: ignore[reportOptionalMemberAccess] expect target already exists in the model
+                                        ] = elementsMappingMap[
+                                            (link.origin.source.uuid, link.origin.uuid) # pyright: ignore[reportOptionalMemberAccess] expect origin already exists in the model
+                                        ]
 
                             else:
                                 LOGGER.warning(
-                                    f"[{mergeExtensions.__name__}] Merge: unknown catalog element [%s] does not have origin",
+                                    f"[{mergeExtensions.__qualname__}] Merge: unknown catalog element [%s] does not have origin",
                                     elem.uuid,
                                 )
                         else:
                             LOGGER.warning(
-                                f"[{mergeExtensions.__name__}] Merge: skip merge of catalog element [%s] of kind [%s]",
+                                f"[{mergeExtensions.__qualname__}] Merge: skip merge of catalog element [%s] of kind [%s]",
                                 elem.uuid,
                                 elem.kind,
                             )
                     else:
                         LOGGER.warning(
-                            f"[{mergeExtensions.__name__}] Merge: unknown catalog element [%s] detacted in target model extension [%s]",
+                            f"[{mergeExtensions.__qualname__}] Merge: unknown catalog element [%s] detacted in target model extension [%s]",
                             elem.uuid,
                             ext.name,
                         )
             else:
                 LOGGER.warning(
-                    f"[{mergeExtensions.__name__}] Merge: unknown extension [%s] detacted in source model [%s]",
+                    f"[{mergeExtensions.__qualname__}] Merge: unknown extension [%s] detacted in source model [%s]",
                     ext.name.model.model.name,
                 )
 
@@ -409,14 +414,16 @@ def mergeRplElement(
 
     # create key for cache matches
     cacheKey = (sourceElement._model.uuid, sourceElement.uuid)
-    cacheOriginKey = (origin._model.uuid, origin.uuid)
+    cacheOriginKey = (origin.source.uuid, origin.uuid) # pyright: ignore[reportOptionalMemberAccess] expect origin already exists in the model
 
     if elementsMappingMap.get(cacheKey) is not None:
         # immediate cached match, at the moment there's no need for a deep merge
-        return elementsMappingMap[cacheKey]
+        elementsMappingMap[cacheOriginKey] = elementsMappingMap[cacheKey]
+        return elementsMappingMap[cacheKey][0]
     elif elementsMappingMap.get(cacheOriginKey) is not None:
         # immediate cached match, at the moment there's no need for a deep merge
-        return elementsMappingMap[cacheOriginKey]
+        elementsMappingMap[cacheKey] = elementsMappingMap[cacheOriginKey]
+        return elementsMappingMap[cacheOriginKey][0]
 
     # first level of elements will be brought right to their direct parents counterparts
     # in destination model, all others will be delivered based on the components internal structure
@@ -426,14 +433,14 @@ def mergeRplElement(
     nearestMatch = list(
         filter(
             lambda x: x.name == sourceElement.name
-            and x.parent.name == sourceElement.parent.name, # pyright: ignore[reportAttributeAccessIssue] name is a legal attribute in this context
+            and x.parent.name == sourceElement.parent.name,  # pyright: ignore[reportAttributeAccessIssue] name is a legal attribute in this context
             dest.model.search(sourceElement.__class__, below=prj.model_root),
         )
     )
 
     if len(nearestMatch) == 0:
         LOGGER.debug(
-            f"[{mergeRplElement.__name__}] no matching element found for [%s] uuid [%s] class [%s], append to the model",
+            f"[{mergeRplElement.__qualname__}] no matching element found for [%s] uuid [%s] class [%s], append to the model",
             sourceElement.name,
             sourceElement.uuid,
             sourceElement.__class__,
@@ -452,14 +459,14 @@ def mergeRplElement(
         elif len(nearestDestParents) > 1:
             nearestDestParent = list(
                 filter(
-                    lambda x: x.name == sourceElement.parent.name # pyright: ignore[reportAttributeAccessIssue] name is a legal attribute in this context
-                    and x.parent.name == sourceElement.parent.parent.name, # pyright: ignore[reportAttributeAccessIssue] name is a legal attribute in this context
+                    lambda x: x.name == sourceElement.parent.name  # pyright: ignore[reportAttributeAccessIssue] name is a legal attribute in this context
+                    and x.parent.name == sourceElement.parent.parent.name,  # pyright: ignore[reportAttributeAccessIssue] name is a legal attribute in this context
                     nearestDestParents,
                 )
             ).pop()
         else:
             LOGGER.fatal(
-                f"[{mergeRplElement.__name__}] impossible case, no nearest parent found for [%s] uuid [%s] class [%s], append to the model",
+                f"[{mergeRplElement.__qualname__}] impossible case, no nearest parent found for [%s] uuid [%s] class [%s], append to the model",
                 sourceElement.name,
                 sourceElement.uuid,
                 sourceElement.__class__,
@@ -497,18 +504,18 @@ def mergeRplElement(
 
         destElement = m.wrap_xml(dest.model, lowLevelDestElement)
 
-        elementsMappingMap[cacheKey] = destElement
-        elementsMappingMap[cacheOriginKey] = destElement
+        elementsMappingMap[cacheKey] = (destElement, True)
+        elementsMappingMap[cacheOriginKey] = (destElement, True)
         return destElement
     else:
         destElement = nearestMatch.pop()
         LOGGER.debug(
-            f"[{mergeRplElement.__name__}] nearest matching element found in target model [%s] uuid [%s] class [%s]; total elements found [%s]",
+            f"[{mergeRplElement.__qualname__}] nearest matching element found in target model [%s] uuid [%s] class [%s]; total elements found [%s]",
             sourceElement.name,
             sourceElement.uuid,
             sourceElement.__class__,
             len(nearestMatch),
         )
-        elementsMappingMap[cacheKey] = destElement
-        elementsMappingMap[cacheOriginKey] = destElement
+        elementsMappingMap[cacheKey] = (destElement, True)
+        elementsMappingMap[cacheOriginKey] = (destElement, True)
         return destElement
