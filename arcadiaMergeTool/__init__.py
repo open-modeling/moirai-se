@@ -9,6 +9,7 @@ logger.setLevel(os.environ.get('LOG_LEVEL_MERGER', logging.getLevelName(logger.g
 
 
 def getLogger(name: str):
+    name = name.replace(".", "_")
     log = logging.getLogger(name)
     log.parent = logger
     log.setLevel(os.environ.get(f"LOG_LEVEL_{name.upper()}", logging.getLevelName(logger.getEffectiveLevel()).upper()))
