@@ -8,12 +8,14 @@ from . import pa
 from . import sa
 from . import _component
 from . import _function
+from . import _part
 
 LOGGER = getLogger(__name__)
 
 __all__ = [
     "_component",
     "_function",
+    "_part",
     "process",
     "epbs",
     "la",
