@@ -1,110 +1,14 @@
-from collections import deque
-import os
-import typing as t
-
-from arcadiaMergeTool import getLogger
-from arcadiaMergeTool.helpers import ExitCodes
-from arcadiaMergeTool.helpers.types import MergerElementMappingMap
-from arcadiaMergeTool.models.config_project_model import ConfigProjectModel
-from arcadiaMergeTool.models.merger_config_model import MergerConfigModel
-from arcadiaMergeTool.models.config_model import ConfigModel
-from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
-from arcadiaMergeTool.helpers.merger import mergeExtensions, mergeLibraries
-from capellambse.model import ModelElement
-import capellambse.model as m
-from capellambse import helpers
 import capellambse.metamodel as mm
-import capellambse.metamodel.re as re
-import capellambse.metamodel.capellamodeller as cm
-import capellambse.metamodel.libraries as li
-from arcadiaMergeTool.processors import process
+from capellambse import helpers
 
+from arcadiaMergeTool.helpers import ExitCodes
+from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
+from arcadiaMergeTool.helpers.types import MergerElementMappingMap
+from arcadiaMergeTool import getLogger
+
+from ._processor import process
 
 LOGGER = getLogger(__name__)
-
-
-def merge(config: ConfigModel):
-    extModels = config.models
-    targetModel = config.target
-    baseModel: ConfigProjectModel = config.base
-
-    mergerConfig = MergerConfigModel(
-        basePath=config.project.basePath,
-        infoPath=os.path.join(config.project.basePath, "debug/"),
-        baseModel=baseModel,
-        name=config.project.name,
-    )
-    os.makedirs(mergerConfig.infoPath, exist_ok=True)
-
-    modelSrc = []
-    modelDst = CapellaMergeModel(targetModel, mergerConfig)
-    modelBase = CapellaMergeModel(model=baseModel, config=mergerConfig)
-
-    for item in extModels:
-        LOGGER.debug(f"[{merge.__name__}] processing external models item ({item})")
-        model = CapellaMergeModel(item, config=mergerConfig)
-
-        modelSrc.append(model)
-
-    elementMappingMap: MergerElementMappingMap = {}
-
-    mergeLibraries(modelDst, modelBase, modelSrc)
-    mergeExtensions(modelDst, modelBase, modelSrc, elementMappingMap)
-    mergeModels(modelDst, modelBase, modelSrc, elementMappingMap)
-
-    modelDst.save()
-
-
-ModelElement_co = t.TypeVar("ModelElement_co", bound=ModelElement, covariant=True)
-
-
-def makeModelElementList(
-    model: CapellaMergeModel, clsname: type[ModelElement_co] | None = None
-) -> deque[m._obj.ModelObject]:
-    """Fetch all model elements from model
-
-    Parameters
-    ==========
-    model:
-        Source model to fetch all data from
-
-    Returns
-    =======
-    Filtered list of found objects
-    """
-
-    # TODO: models can be huge, use generators to iterate through the model
-    lst = deque(
-        filter(
-            lambda x: not isinstance(x, re.CatalogElement)
-            and not isinstance(x, re.CatalogElementLink)
-            and not isinstance(x, re.RecCatalog)
-            and not isinstance(x, cm.SystemEngineering)
-            and not isinstance(x, cm.Project)
-            and not isinstance(x, li.LibraryReference)
-            and not isinstance(x, li.ModelInformation),
-            model.model.search(ModelElement, below=model.model.project),
-        )
-    )
-    if clsname is not None:
-        return deque(filter(lambda x: isinstance(x, clsname), lst))
-    else:
-        return lst
-
-
-# @process.register
-# def _(x: mm.capellacommon.Region, dest: CapellaMergeModel, src: CapellaMergeModel, base: CapellaMergeModel, mapping: MergerElementMappingMap) -> bool:
-#     return f"Region: name={x.name}, class={x.__class__}"
-
-CAPELLA_NAMES_SYSTEM = "System"
-""" Constant to distinct System from other components"""
-CAPELLA_NAMES_PHYSICAL_SYSTEM = "Physical System"
-""" Constant to distinct Physical System from other components"""
-CAPELLA_NAMES_LOGICAL_SYSTEM = "Logical System"
-""" Constant to distinct Logical System from other components"""
-CAPELLA_NAMES_EPBS_SYSTEM = "System"
-""" Constant to distinct EPBS System from other components"""
-
 
 @process.register
 def _(
@@ -114,7 +18,7 @@ def _(
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ) -> bool:
-    """Process SystemComponent
+    """Find and merge Components
 
     Parameters
     ==========
@@ -152,7 +56,22 @@ def _(
         if not process(modelParent, dest, src, base, mapping):
             return False
         
-        destParent = mapping[modelParent._model.uuid, modelParent.uuid][0]
+        destParent = None
+        try:
+            destParent = mapping[modelParent._model.uuid, modelParent.uuid][0]
+        except Exception as ex:
+            LOGGER.fatal(f"[{process.__qualname__}] Component parent was not found in cache, name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
+                x.name,
+                x.uuid,
+                x.__class__,
+                modelParent.name,
+                modelParent.uuid,
+                modelParent.__class__,
+                x._model.name,
+                x._model.uuid,
+                exc_info=ex
+            )
+            exit(str(ExitCodes.MergeFault))
 
         targetCollection = None
 
@@ -180,11 +99,13 @@ def _(
             targetCollection = destParent.configuration_items
         else:
             LOGGER.fatal(
-                f"[{process.__qualname__}] Component parent is not a valid parent, Component name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
+                f"[{process.__qualname__}] Component parent is not a valid parent, Component name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
                 x.name,
                 x.uuid,
+                x.__class__,
                 destParent.name,
                 destParent.uuid,
+                destParent.__class__,
                 x._model.name,
                 x._model.uuid,
             )
@@ -196,6 +117,7 @@ def _(
             matchingComponent = list(filter(lambda y: y.name == x.name, targetCollection))
 
             if (len(matchingComponent) > 0):
+                # coming here means that component was added in a project, not taken from the library
                 LOGGER.error(
                     f"[{process.__qualname__}] Non-library component detected. Component name [%s], uuid [%s], model name [%s], uuid [%s]",
                     x.name,
@@ -203,9 +125,17 @@ def _(
                     x._model.name,
                     x._model.uuid,
                 )
+
                 # assume it's same to take first, but theme might be more
                 mapping[(x._model.uuid, x.uuid)] = (matchingComponent[0], False)
             else:
+                LOGGER.debug(
+                    f"[{process.__qualname__}] Create a non-library component name [%s], uuid [%s], model name [%s], uuid [%s]",
+                    x.name,
+                    x.uuid,
+                    x._model.name,
+                    x._model.uuid,
+                )
                 newComp = targetCollection.create(xtype=helpers.qtype_of(x._element)) 
 
                 # update newly created component and save it for future use
@@ -236,39 +166,3 @@ def _(
             )
 
     return True
-
-
-# @process.register
-# def _(x: mm.fa.ComponentPort, dest: CapellaMergeModel, src: CapellaMergeModel, base: CapellaMergeModel, mapping: MergerElementMappingMap) -> bool:
-#     return f"ComponentPort: name={x.name}, class={x.__class__}"
-
-
-def mergeModels(
-    dest: CapellaMergeModel,
-    base: CapellaMergeModel,
-    src: list[CapellaMergeModel],
-    elementMappingMap: MergerElementMappingMap,
-):
-    """Merge models
-    Docstring for mergeModels
-
-    :param dest: Description
-    :type dest: CapellaMergeModel
-    :param base: Description
-    :type base: CapellaMergeModel
-    :param src: Description
-    :type src: list[CapellaMergeModel]
-    :param elementMappingMap: Description
-    :type elementMappingMap: MergerElementMappingMap
-    """
-
-    LOGGER.info(f"[{mergeModels.__name__}] begin merging models into target model")
-
-    for model in src:
-        list = makeModelElementList(model)  # ,  mm.capellacommon.Region
-
-        while list:
-            elem = list.pop()
-            res = process(elem, dest, base, src[0], elementMappingMap)
-            if not res:
-                list.appendleft(elem)

@@ -1,0 +1,11 @@
+CAPELLA_NAMES_SYSTEM = "System"
+""" Constant to distinct System from other components"""
+CAPELLA_NAMES_PHYSICAL_SYSTEM = "Physical System"
+""" Constant to distinct Physical System from other components"""
+CAPELLA_NAMES_LOGICAL_SYSTEM = "Logical System"
+""" Constant to distinct Logical System from other components"""
+CAPELLA_NAMES_EPBS_SYSTEM = "System"
+""" Constant to distinct EPBS System from other components"""
+
+REC_CATALOG_NAME = "REC Catalog"
+""" Constant to distinct other entensions from REC Catalog"""
