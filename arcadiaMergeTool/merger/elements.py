@@ -74,4 +74,5 @@ def mergeElements(
             elem = list.pop()
             res = process(elem, dest, base, src[0], elementMappingMap)
             if not res:
+                LOGGER.debug(f"[{mergeElements.__qualname__}] element [%s], uuid [%s] put back to queue", elem.name, elem.uuid)
                 list.appendleft(elem)

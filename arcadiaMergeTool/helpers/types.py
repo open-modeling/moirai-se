@@ -1,14 +1,18 @@
 import typing as t
 from capellambse.model import ModelElement
 
+type FromLibrary = bool
+type ModelUuid = str
+type ComponentUuid = str
+
 type MergerElementMappingMap = dict[
     tuple[
-        str,  # model uuid
-        str,  # component uuid
+        ModelUuid,  # model uuid
+        ComponentUuid,  # component uuid
     ],
     tuple[
         ModelElement,  # matching component in destination model
-        bool,  # came from library flag
+        FromLibrary,  # came from library flag
     ],
 ]
 

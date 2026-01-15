@@ -27,7 +27,7 @@ def _(
     dest:
         Destination model to add parts to
     src:
-        Source parts to take parts from
+        Source model to take parts from
     base:
         Base model to check parts against
     mapping:
@@ -81,11 +81,11 @@ def _(
             ) and modelParent.parts[0] == x:
             # HACK: assume System is a very first root part
             # map system to system and assume it's done
-            mapping[(x._model.uuid, x.uuid)] = (modelParent.parts[0], False)
+            mapping[(x._model.uuid, x.uuid)] = (destParent.parts[0], False)
         elif isinstance(modelParent, mm.epbs.ConfigurationItemPkg) and modelParent.configuration_items[0] == x:
             # HACK: assume System is a very first root configuratiobn item
             # map system to system and assume it's done
-            mapping[(x._model.uuid, x.uuid)] = (modelParent.configuration_items[0], False)
+            mapping[(x._model.uuid, x.uuid)] = (destParent.configuration_items[0], False)
         elif isinstance(destParent, mm.pa.PhysicalComponentPkg):
             targetCollection = destParent.owned_parts
         elif (
@@ -119,12 +119,15 @@ def _(
             if (len(matchingPart) > 0):
                 # coming here means that part was added in a project, not taken from the library
                 LOGGER.error(
-                    f"[{process.__qualname__}] Non-library part detected. Part name [%s], uuid [%s], model name [%s], uuid [%s]",
+                    f"[{process.__qualname__}] Non-library part detected. Part name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
                     x.name,
                     x.uuid,
+                    destParent.name,
+                    destParent.uuid,
                     x._model.name,
                     x._model.uuid,
                 )
+
 
                 # assume it's same to take first, but theme might be more
                 mapping[(x._model.uuid, x.uuid)] = (matchingPart[0], False)
@@ -136,11 +139,55 @@ def _(
                     x._model.name,
                     x._model.uuid,
                 )
+
+                if not process(x.type, dest, src, base, mapping):
+                    # part is merely a link to a component, check if component can be references
+                    # if not, stop processing to retry later
+                    return False
+
                 newComp = targetCollection.create(xtype=helpers.qtype_of(x._element)) 
 
-                # update newly created part and save it for future use
+                # TODO: track PVMT
+                # .applied_property_value_groups = []
+                # .applied_property_values = []
+                # .property_value_groups = []
+                # .property_values = []
+
+                # TODO: check how to copy these values
+                # newComp.default_value = x.default_value
+                # newComp.max_card = x.max_card
+                # newComp.max_length = x.max_length
+                # newComp.max_value = x.max_value
+                # newComp.min_card = x.min_card
+                # newComp.min_length = x.min_length
+                # newComp.min_value = x.min_value
+                # newComp.null_value = x.null_value
+                # newComp.owned_type = x.owned_type
+                # if not isinstance(newComp, mm.epbs.ConfigurationItem):
+                    # newComp.status = x.status
+
+                newComp.type = mapping[(x._model.uuid, x.type.uuid)][0] # pyright: ignore[reportOptionalMemberAccess] expect type exists and uuid is valid
                 newComp.name = x.name
                 newComp.description = x.description
+                newComp.description = x.description
+                newComp.is_abstract = x.is_abstract
+                newComp.is_derived = x.is_derived
+                newComp.is_final = x.is_final
+                newComp.is_max_inclusive = x.is_max_inclusive
+                newComp.is_min_inclusive = x.is_min_inclusive
+                newComp.is_ordered = x.is_ordered
+                newComp.is_part_of_key = x.is_part_of_key
+                newComp.is_read_only = x.is_read_only
+                newComp.is_static = x.is_static
+                newComp.is_unique = x.is_unique
+                newComp.is_visible_in_doc = x.is_visible_in_doc
+                newComp.is_visible_in_lm = x.is_visible_in_lm
+                newComp.name = x.name
+                newComp.review = x.review
+                newComp.sid = x.sid
+                newComp.summary = x.summary
+                newComp.visibility = x.visibility
+
                 # TODO: add other properties, but do not touch linked elements - they are processed by top level iterator
                 mapping[(x._model.uuid, x.uuid)] = (newComp, False)
 
