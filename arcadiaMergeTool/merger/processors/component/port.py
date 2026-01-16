@@ -7,7 +7,7 @@ from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
 
-from ._processor import process
+from arcadiaMergeTool.merger.processors._processor import process
 
 LOGGER = getLogger(__name__)
 

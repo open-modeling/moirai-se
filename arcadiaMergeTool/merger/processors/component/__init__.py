@@ -6,7 +6,14 @@ from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
 
-from ._processor import process
+from arcadiaMergeTool.merger.processors._processor import process
+
+from . import exchange, port
+
+__all__ = [
+    "exchange",
+    "port"
+]
 
 LOGGER = getLogger(__name__)
 

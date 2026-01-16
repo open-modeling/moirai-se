@@ -6,7 +6,7 @@ from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
 
-from ._processor import process
+from .._processor import process
 
 LOGGER = getLogger(__name__)
 
@@ -96,13 +96,13 @@ def _(
             )
             exit(str(ExitCodes.MergeFault))
 
-        mappedSource = mapping.get((x._model.uuid, x.source.uuid))
-        mappedTarget = mapping.get((x._model.uuid, x.target.uuid))
+        mappedSource = mapping.get((x._model.uuid, x.source.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect source is already there
+        mappedTarget = mapping.get((x._model.uuid, x.target.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect target is already there
         if mappedSource is None or mappedTarget is None:
             # if source or target is not mapped, postpone allocation processing
             return False
         
-        matchingFunction = list(filter(lambda y: y.source == mappedSource[0] and x.target == mappedTarget[0], targetCollection))
+        matchingFunction = list(filter(lambda y: y.source == mappedSource[0] and x.target == mappedTarget[0], targetCollection)) # pyright: ignore[reportOptionalSubscript] check for none is above, mappedSource and mappedTarget are safe
 
         if (len(matchingFunction) > 0):
             # assume it's same to take first, but theme might be more

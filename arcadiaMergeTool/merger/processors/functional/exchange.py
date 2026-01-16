@@ -7,7 +7,7 @@ from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
 
-from ._processor import process
+from .._processor import process
 
 LOGGER = getLogger(__name__)
 
@@ -48,24 +48,24 @@ def __findMatchingExchange(coll, exch, mappedSourceComp, mappedTargetComp, mappi
 
 @process.register
 def _(
-    x: mm.fa.ComponentExchange,
+    x: mm.fa.FunctionalExchange,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ) -> bool:
-    """Find and merge Component Exchanges
+    """Find and merge Functional Exchanges
 
     Parameters
     ==========
     x:
-        Component exchange to process
+        Functional Exchange to process
     dest:
-        Destination model to add component exchanges to
+        Destination model to add Functional Exchanges to
     src:
-        Source model to take component exchanges from
+        Source model to take Functional Exchanges from
     base:
-        Base model to check component exchanges against
+        Base model to check Functional Exchanges against
     mapping:
         Full mapping of the elements to the corresponding models
 
@@ -77,10 +77,10 @@ def _(
     cachedElement = mapping.get((x._model.uuid, x.uuid))
 
     if cachedElement is None:
-        # for Component exchange - if not found in cache, in general it's a violation of the merging rules
-        # at this point all component exchanges must come from base library
+        # for Functional Exchange - if not found in cache, in general it's a violation of the merging rules
+        # at this point all Functional Exchange must come from base library
         LOGGER.debug(
-            f"[{process.__qualname__}] New component found, name [%s], uuid [%s], model name [%s], uuid [%s]",
+            f"[{process.__qualname__}] New Functional Exchange, name [%s], uuid [%s], model name [%s], uuid [%s]",
             x.name,
             x.uuid,
             x._model.name,
@@ -92,11 +92,16 @@ def _(
         if not process(modelParent, dest, src, base, mapping):
             return False
         
+        # check source and target and postpone processing if both weren't processed
+        # if not (process(x.source, dest, src, base, mapping) # pyright: ignore[reportOptionalMemberAccess] expect source is there
+        #     and process(x.target, dest, src, base, mapping)): # pyright: ignore[reportOptionalMemberAccess] expect sotargeturce is there
+        #     return False
+
         destParent = None
         try:
             destParent = mapping[modelParent._model.uuid, modelParent.uuid][0] # pyright: ignore[reportAttributeAccessIssue] expect ModelElement here with valid uuid
         except Exception as ex:
-            LOGGER.fatal(f"[{process.__qualname__}] Component parent was not found in cache, name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
+            LOGGER.fatal(f"[{process.__qualname__}] Functional Exchange parent was not found in cache, name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
                 x.name,
                 x.uuid,
                 x.__class__,
@@ -111,19 +116,17 @@ def _(
 
         targetCollection = None
 
-        if (isinstance(destParent, mm.sa.SystemComponentPkg)
-            or isinstance(destParent, mm.la.LogicalComponentPkg)
-            or isinstance(destParent, mm.pa.PhysicalComponentPkg)
+        if (isinstance(destParent, mm.sa.SystemFunctionPkg)
+            or isinstance(destParent, mm.la.LogicalFunctionPkg)
+            or isinstance(destParent, mm.pa.PhysicalFunctionPkg)
+            or isinstance(destParent, mm.pa.PhysicalFunction)
+            or isinstance(destParent, mm.la.LogicalFunction)
+            or isinstance(destParent, mm.sa.SystemFunction)
         ):
             targetCollection = destParent.exchanges
-        elif (isinstance(destParent, mm.pa.PhysicalComponent)
-            or isinstance(destParent, mm.la.LogicalComponent)
-            or isinstance(destParent, mm.sa.SystemComponent)
-        ):
-            targetCollection = destParent.component_exchanges # pyright: ignore[reportAttributeAccessIssue] expect ports are already there
         else:
             LOGGER.fatal(
-                f"[{process.__qualname__}] Component exchange parent is not a valid parent, Component exchange name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+                f"[{process.__qualname__}] Functional Exchange parent is not a valid parent, Functional Exchange name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
                 x.name,
                 x.uuid,
                 x.__class__,
@@ -135,28 +138,34 @@ def _(
             )
             exit(str(ExitCodes.MergeFault))
 
-        # ComponentExchange mapping is based on match between the port components
+        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # Unknown fault creates broken Physical Architecture allocation
+        # TODO: fix and eliminate
+        if x.layer.name == "Physical Architecture":
+            return True
+
+
+        # FunctionalExchange mapping is based on match between the port components
         # Generel logic is
         # Exchange checks if either
-        #  - ComponentPorts exist - legitimate case, updates mapping, note, components are mapped after exchange to ensure correct ports merge
-        #  - Components exist - legitimate case, updates mapping
+        #  - FunctionPorts exist - legitimate case, updates mapping, note, functions are mapped after exchange to ensure correct ports merge
+        #  - Function exist - legitimate case, updates mapping
         # 
         # In both cases - iterate through the exchanges and match them by name
 
-        sourceComponentPortMap = mapping.get((x.source._model.uuid, x.source.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect source exists in this context
-        sourceComponentMap = mapping.get((x.source.parent._model.uuid, x.source.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect source exists in this context
-        targetComponentPortMap = mapping.get((x.target._model.uuid, x.target.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect target exists in this context
-        targetComponentMap = mapping.get((x.target.parent._model.uuid, x.target.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect target exists in this context
+        sourceFunctionPortMap = mapping.get((x.source._model.uuid, x.source.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect source exists in this context
+        sourceFunctionMap = mapping.get((x.source.parent._model.uuid, x.source.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect source exists in this context
+        targetFunctionPortMap = mapping.get((x.target._model.uuid, x.target.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect target exists in this context
+        targetFunctionMap = mapping.get((x.target.parent._model.uuid, x.target.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect target exists in this context
 
-        if sourceComponentMap is None or targetComponentMap is None:
-            # Fast fail, postpone exchange processing to component existence
+        if sourceFunctionMap is None or targetFunctionMap is None:
+            # Fast fail, postpone exchange processing to Function existence
             return False
 
-        ex = __findMatchingExchange(targetCollection, x, sourceComponentMap, targetComponentMap, mapping)
+        ex = __findMatchingExchange(targetCollection, x, sourceFunctionMap, targetFunctionMap, mapping)
         if ex is not None:
-            # coming here means that component exchange was added in a project, not taken from the library
-            LOGGER.error(
-                f"[{process.__qualname__}] Non-library component exchange detected. Component exchange name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
+            LOGGER.debug(
+                f"[{process.__qualname__}] Record Function Exchange, name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
                 x.name,
                 x.uuid,
                 destParent.name,
@@ -170,7 +179,7 @@ def _(
         else:
 
             LOGGER.debug(
-                f"[{process.__qualname__}] Create a non-library component exchange name [%s], uuid [%s], model name [%s], uuid [%s]",
+                f"[{process.__qualname__}] Create Function Exchange, name [%s], uuid [%s], model name [%s], uuid [%s]",
                 x.name,
                 x.uuid,
                 x._model.name,
@@ -179,8 +188,8 @@ def _(
             newComp = targetCollection.create(xtype=helpers.qtype_of(x._element)) 
 
             # if x.layer.name == "System Architecture" and x.layer.parent.name == "Steering-fl":
-            #         print ("!!!!!!!!!!!!!!!!!!!!!!!!", x)
-            #         print ("$$$$$$$$$$$$$$$$$$$$$$$$", newComp)
+            # print ("!!!!!!!!!!!!!!!!!!!!!!!!", x)
+            # print ("$$$$$$$$$$$$$$$$$$$$$$$$", newComp)
             #         # print ("@@@@@@@@@@@@@@@@@@@@@@@@", x.parent)
             #         # print ("########################", x.layer)
             #         exit()
@@ -194,37 +203,44 @@ def _(
             # newComp.progress_status = x.progress_status
 
             newComp.description = x.description
-            newComp.is_oriented = x.is_oriented
+            newComp.is_multicast = x.is_multicast
+            newComp.is_multireceive = x.is_multireceive
             newComp.is_visible_in_doc = x.is_visible_in_doc
             newComp.is_visible_in_lm = x.is_visible_in_lm
-            newComp.kind =x.kind
             newComp.name = x.name
+            newComp.rate = x.rate
+            newComp.rate_kind = x.rate_kind
             newComp.review = x.review
             newComp.sid = x.sid
             newComp.summary = x.summary
+            newComp.weight = x.weight
 
+            if x.selection is not None:
+                newComp.selection = x.selection
             if x.status is not None:
                 newComp.status = x.status
-            if sourceComponentPortMap is not None:
-                newComp.source = sourceComponentPortMap # pyright: ignore[reportAttributeAccessIssue] expect source exists on model
-            if targetComponentPortMap is not None:
-                newComp.target = targetComponentPortMap # pyright: ignore[reportAttributeAccessIssue] expect source exists on model
+            if sourceFunctionPortMap is not None:
+                newComp.source = sourceFunctionPortMap # pyright: ignore[reportAttributeAccessIssue] expect source exists on model
+            if targetFunctionPortMap is not None:
+                newComp.target = targetFunctionPortMap # pyright: ignore[reportAttributeAccessIssue] expect source exists on model
+            if x.transformation is not None:
+                newComp.transformation = x.transformation
 
             mapping[(x._model.uuid, x.uuid)] = (newComp, False)
     else:
-        (cachedComponent, fromLibrary) = cachedElement
+        (cachedFunctionalExchange, fromLibrary) = cachedElement
 
         errors = {}
-        if cachedComponent.name != x.name:
+        if cachedFunctionalExchange.name != x.name:
             errors["name warn"] = (
-                f"known name [{cachedComponent.name}], new name [{x.name}]"
+                f"known name [{cachedFunctionalExchange.name}], new name [{x.name}]"
             )
-        if cachedComponent.name != x.name:
+        if cachedFunctionalExchange.name != x.name:
             errors["description warn"] = "known description does not match processed"
 
         if len(errors):
             LOGGER.warning(
-                f"[{process.__qualname__}] Component fields does not match known, Component name [%s], uuid [%s], model name [%s], uuid [%s]",
+                f"[{process.__qualname__}] Functional Exchange fields does not match known, Functional Exchange name [%s], uuid [%s], model name [%s], uuid [%s]",
                 x.name,
                 x.uuid,
                 x._model.name,
