@@ -1,3 +1,5 @@
+
+import uuid
 import capellambse.metamodel as mm
 from capellambse import helpers
 
@@ -118,19 +120,23 @@ def _(
 
             if (len(matchingPart) > 0):
                 # coming here means that part was added in a project, not taken from the library
-                LOGGER.error(
-                    f"[{process.__qualname__}] Non-library part detected. Part name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
-                    x.name,
-                    x.uuid,
-                    destParent.name,
-                    destParent.uuid,
-                    x._model.name,
-                    x._model.uuid,
-                )
 
+                targetPart = matchingPart[0]
+                mappedTargetPart = mapping.get((targetPart._model.uuid, targetPart.uuid))
+                fromLibrary = mappedTargetPart[1] if mappedTargetPart is not None else False
+                if not fromLibrary:
+                    LOGGER.error(
+                        f"[{process.__qualname__}] Non-library part detected. Part name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
+                        x.name,
+                        x.uuid,
+                        destParent.name,
+                        destParent.uuid,
+                        x._model.name,
+                        x._model.uuid,
+                    )
 
                 # assume it's same to take first, but theme might be more
-                mapping[(x._model.uuid, x.uuid)] = (matchingPart[0], False)
+                mapping[(x._model.uuid, x.uuid)] = (matchingPart[0], fromLibrary)
             else:
                 LOGGER.debug(
                     f"[{process.__qualname__}] Create a non-library part name [%s], uuid [%s], model name [%s], uuid [%s]",

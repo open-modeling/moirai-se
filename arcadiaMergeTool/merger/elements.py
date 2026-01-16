@@ -7,6 +7,7 @@ from arcadiaMergeTool.helpers.types import MergerElementMappingMap, ModelElement
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from capellambse.model import ModelElement
 import capellambse.model as m
+import capellambse.metamodel as mm
 import capellambse.metamodel.re as re
 import capellambse.metamodel.capellamodeller as cm
 import capellambse.metamodel.libraries as li
@@ -29,6 +30,9 @@ def _makeModelElementList(
     Filtered list of found objects
     """
 
+    # print (list(model.model.search(mm.fa.ComponentFunctionalAllocation, below=model.model.project)),)
+    # exit()
+
     # TODO: models can be huge, use generators to iterate through the model
     lst = deque(
         filter(
@@ -40,6 +44,7 @@ def _makeModelElementList(
             and not isinstance(x, li.LibraryReference)
             and not isinstance(x, li.ModelInformation),
             model.model.search(ModelElement, below=model.model.project),
+            # model.model.search(mm.fa.ComponentFunctionalAllocation, below=model.model.project)
         )
     )
     if clsname is not None:
@@ -72,7 +77,7 @@ def mergeElements(
 
         while list:
             elem = list.pop()
-            res = process(elem, dest, base, src[0], elementMappingMap)
+            res = process(elem, dest, model, base, elementMappingMap)
             if not res:
                 LOGGER.debug(f"[{mergeElements.__qualname__}] element [%s], uuid [%s] put back to queue", elem.name, elem.uuid)
                 list.appendleft(elem)

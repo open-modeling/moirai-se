@@ -32,7 +32,7 @@ def __findMatchingPort(coll, exch):
             if ex.name == exch.name:
                 return port
 
-def __createCompoentPort(x: mm.fa.ComponentPort, targetCollection: m._obj.ElementList) -> mm.fa.ComponentPort:
+def __createCompoentPort(x: mm.fa.FunctionPort, targetCollection: m._obj.ElementList) -> mm.fa.FunctionPort:
     """Create port in model
 
     Parameters
@@ -45,7 +45,7 @@ def __createCompoentPort(x: mm.fa.ComponentPort, targetCollection: m._obj.Elemen
     """
 
     LOGGER.debug(
-        f"[{process.__qualname__}] Create a non-library Component Port name [%s], uuid [%s], model name [%s], uuid [%s]",
+        f"[{process.__qualname__}] Create Function Port name [%s], uuid [%s], model name [%s], uuid [%s]",
         x.name,
         x.uuid,
         x._model.name,
@@ -58,41 +58,25 @@ def __createCompoentPort(x: mm.fa.ComponentPort, targetCollection: m._obj.Elemen
     # .applied_property_values = []
     # .property_value_groups = []
     # .property_values = []
-    # .pvmt = 
+    # .pvmt =
 
     # TODO: find a way to copy these properties
-    # .default_value = None
-    # .max_card = None
-    # .max_length = None
-    # .max_value = None
-    # .min_card = None
-    # .min_length = None
-    # .min_value = None
-    # .null_value = None
-    # newComp.progress_status = x.progress_status
 
-    newComp.aggregation_kind = x.aggregation_kind
-    newComp.description = x.description
-    newComp.is_abstract = x.is_abstract
-    newComp.is_derived = x.is_derived
-    newComp.is_final = x.is_final
-    newComp.is_max_inclusive = x.is_max_inclusive
-    newComp.is_min_inclusive = x.is_min_inclusive
-    newComp.is_ordered = x.is_ordered
-    newComp.is_part_of_key = x.is_part_of_key
-    newComp.is_read_only = x.is_read_only
-    newComp.is_static = x.is_static
-    newComp.is_unique = x.is_unique
+    newComp.is_control = x.is_control
+    newComp.is_control_type = x.is_control_type
     newComp.is_visible_in_doc = x.is_visible_in_doc
     newComp.is_visible_in_lm = x.is_visible_in_lm
-    newComp.kind = x.kind
     newComp.name = x.name
-    newComp.orientation = x.orientation
+    newComp.node_kind = x.node_kind
+    newComp.ordering = x.ordering
     newComp.review = x.review
     newComp.sid = x.sid
     newComp.summary = x.summary
-    newComp.visibility = x.visibility
 
+    if x.selection is not None:
+        newComp.selection = x.selection
+    if x.represented_component_port is not None:
+        newComp.represented_component_port = x.represented_component_port
     if x.status is not None:
         newComp.status = x.status
     if x.type is not None:
@@ -102,24 +86,24 @@ def __createCompoentPort(x: mm.fa.ComponentPort, targetCollection: m._obj.Elemen
 
 @process.register
 def _(
-    x: mm.fa.ComponentPort,
+    x: mm.fa.FunctionPort,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ) -> bool:
-    """Find and merge Component Ports
+    """Find and merge Functuon Ports
 
     Parameters
     ==========
     x:
-        Component port to process
+        Functuon port to process
     dest:
-        Destination model to add component ports to
+        Destination model to add functuon ports to
     src:
-        Source model to take component ports from
+        Source model to take functuon ports from
     base:
-        Base model to check component ports against
+        Base model to check functuon ports against
     mapping:
         Full mapping of the elements to the corresponding models
 
@@ -131,10 +115,10 @@ def _(
     cachedElement = mapping.get((x._model.uuid, x.uuid))
 
     if cachedElement is None:
-        # for Component port - if not found in cache, in general it's a violation of the merging rules
-        # at this point all component ports must come from base library
+        # for Function port - if not found in cache, in general it's a violation of the merging rules
+        # at this point all function ports must come from base library
         LOGGER.debug(
-            f"[{process.__qualname__}] New Component Port found, name [%s], uuid [%s], model name [%s], uuid [%s]",
+            f"[{process.__qualname__}] New Function Port found, name [%s], uuid [%s], model name [%s], uuid [%s]",
             x.name,
             x.uuid,
             x._model.name,
@@ -150,7 +134,7 @@ def _(
         try:
             destParent = mapping[modelParent._model.uuid, modelParent.uuid][0] # pyright: ignore[reportAttributeAccessIssue] expect ModelElement here with valid uuid
         except Exception as ex:
-            LOGGER.fatal(f"[{process.__qualname__}] Component Port parent was not found in cache, name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
+            LOGGER.fatal(f"[{process.__qualname__}] Function Port parent was not found in cache, name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
                 x.name,
                 x.uuid,
                 x.__class__,
@@ -165,16 +149,30 @@ def _(
 
         targetCollection = None
 
-        if (isinstance(destParent, mm.sa.SystemComponentPkg)
-            or isinstance(destParent, mm.la.LogicalComponentPkg)
-            or isinstance(destParent, mm.pa.PhysicalComponent)
-            or isinstance(destParent, mm.la.LogicalComponent)
-            or isinstance(destParent, mm.sa.SystemComponent)
+        if (isinstance(destParent, mm.pa.PhysicalFunction)
+            or isinstance(destParent, mm.la.LogicalFunction)
+            or isinstance(destParent, mm.sa.SystemFunction)
+            or isinstance(destParent, mm.oa.OperationalActivity)
         ):
-            targetCollection = destParent.ports # pyright: ignore[reportAttributeAccessIssue] expect ports are already there
+            if isinstance(x, mm.fa.FunctionInputPort):
+                targetCollection = destParent.inputs
+            elif isinstance(x, mm.fa.FunctionOutputPort):
+                targetCollection = destParent.outputs
+            else:
+                LOGGER.fatal(f"[{process.__qualname__}] Unknown Function Port type, name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
+                    x.name,
+                    x.uuid,
+                    x.__class__,
+                    modelParent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
+                    modelParent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
+                    modelParent.__class__,
+                    x._model.name,
+                    x._model.uuid,
+                )
+                exit(str(ExitCodes.MergeFault))
         else:
             LOGGER.fatal(
-                f"[{process.__qualname__}] Component Port parent is not a valid parent, Component Port name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+                f"[{process.__qualname__}] Function Port parent is not a valid parent, Function Port name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
                 x.name,
                 x.uuid,
                 x.__class__,
@@ -186,6 +184,13 @@ def _(
             )
             exit(str(ExitCodes.MergeFault))
 
+        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # Unknown fault creates broken Physical Architecture allocation
+        # TODO: fix and eliminate
+        if x.layer.name == "Physical Architecture":
+            return True
+
+
         # General Cases
         # 1. Port is bounded to disjoint set of exchanges
         # 2. Port is bounded to subset of exchanges
@@ -193,7 +198,7 @@ def _(
         # 4. Port is bounded to intersecting of exchanges
 
         # Merge logic
-        # 1. Port depends on ComponentExchange, not opposite
+        # 1. Port depends on FunctionExchange, not opposite
         # 2. Exchange defines transferrable elements
         # 3. If exchange from source model is not landed, delay port landing as well
         # 
@@ -209,7 +214,7 @@ def _(
                 # for unmapped exchanges - wait until they are merged into the model
                 # do not proceed with other exchanges, it will be done in one shot
                 LOGGER.debug(
-                    f"[{process.__qualname__}] dependent Component Exchange is not mapped, exchange name [%s], uuid [%s], model name [%s], uuid [%s]",
+                    f"[{process.__qualname__}] dependent Function Exchange is not mapped, exchange name [%s], uuid [%s], model name [%s], uuid [%s]",
                     ex.name,
                     ex.uuid,
                     x._model.name,
@@ -253,7 +258,7 @@ def _(
         if len(portCandidates.items()) > 1:
             # potential intersected set case, go fault
             LOGGER.fatal(
-                f"[{process.__qualname__}] Several port candidates detected, cannot proceed with merge. Component port name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
+                f"[{process.__qualname__}] Several port candidates detected, cannot proceed with merge. Function Port name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
                 x.name,
                 x.uuid,
                 destParent.name,
@@ -268,9 +273,9 @@ def _(
             port = list(portCandidates.values()).pop()
             mappedPort = mapping.get((port._model.uuid, port.uuid))
             if not mappedPort:
-                # coming here means that component was directly added into the model, not taken from the library
-                LOGGER.error(
-                    f"[{process.__qualname__}] Non-library component port detected. Component port name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
+                # coming here means that function was directly added into the model, not taken from the library
+                LOGGER.debug(
+                    f"[{process.__qualname__}] Adding Function Port into model name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
                     x.name,
                     x.uuid,
                     destParent.name,
@@ -287,19 +292,19 @@ def _(
             mapping[(x._model.uuid, x.uuid)] = (newPort, False)
 
     else:
-        (cachedComponent, fromLibrary) = cachedElement
+        (cachedFunction, fromLibrary) = cachedElement
 
         errors = {}
-        if cachedComponent.name != x.name:
+        if cachedFunction.name != x.name:
             errors["name warn"] = (
-                f"known name [{cachedComponent.name}], new name [{x.name}]"
+                f"known name [{cachedFunction.name}], new name [{x.name}]"
             )
-        if cachedComponent.name != x.name:
+        if cachedFunction.name != x.name:
             errors["description warn"] = "known description does not match processed"
 
         if len(errors):
             LOGGER.warning(
-                f"[{process.__qualname__}] Component Port fields does not match known, Component Port name [%s], uuid [%s], model name [%s], uuid [%s]",
+                f"[{process.__qualname__}] Function Port fields does not match known, Function Port name [%s], uuid [%s], model name [%s], uuid [%s]",
                 x.name,
                 x.uuid,
                 x._model.name,

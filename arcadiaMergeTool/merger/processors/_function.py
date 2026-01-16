@@ -181,7 +181,6 @@ def _(
                 newComp.is_leaf = x.is_leaf # pyright: ignore[reportAttributeAccessIssue] expect properties exists
                 newComp.progress_status = x.progress_status # pyright: ignore[reportAttributeAccessIssue] expect properties exists
 
-            # TODO: add other properties, but do not touch linked elements - they are processed by top level iterator
             mapping[(x._model.uuid, x.uuid)] = (newComp, False)
 
     else:
@@ -197,7 +196,7 @@ def _(
 
         if len(errors):
             LOGGER.warning(
-                f"[{process.__qualname__}] Component fields does not match known, Component name [%s], uuid [%s], model name [%s], uuid [%s]",
+                f"[{process.__qualname__}] Function fields does not match known, Component name [%s], uuid [%s], model name [%s], uuid [%s]",
                 x.name,
                 x.uuid,
                 x._model.name,
