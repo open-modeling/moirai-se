@@ -8,11 +8,12 @@ from arcadiaMergeTool import getLogger
 
 from .._processor import process
 
-from . import allocation, port
+from . import allocation, port, realization
 
 __all__ = [
     "allocation",
-    "port"
+    "port",
+    "realization"
 ]
 
 LOGGER = getLogger(__name__)
@@ -157,7 +158,6 @@ def _(
             # newComp.min_length = x.min_length
             # newComp.min_value = x.min_value
             # newComp.null_value = x.null_value
-            # newComp.status = x.status
             # newComp.type = x.type
 
             newComp.aggregation_kind = x.aggregation_kind
@@ -182,11 +182,8 @@ def _(
             newComp.summary = x.summary
             newComp.visibility = x.visibility
 
-            if not (isinstance(newComp, mm.pa.PhysicalFunction)
-                or isinstance(newComp, mm.la.LogicalFunction)
-                or isinstance(newComp, mm.sa.SystemFunction)):
-                newComp.is_leaf = x.is_leaf # pyright: ignore[reportAttributeAccessIssue] expect properties exists
-                newComp.progress_status = x.progress_status # pyright: ignore[reportAttributeAccessIssue] expect properties exists
+            if x.status is not None:
+                newComp.status = x.status
 
             mapping[(x._model.uuid, x.uuid)] = (newComp, False)
 
@@ -194,21 +191,21 @@ def _(
         (cachedFunction, fromLibrary) = cachedElement
 
         errors = {}
-        if cachedFunction.name != x.name:
-            errors["name warn"] = (
-                f"known name [{cachedFunction.name}], new name [{x.name}]"
-            )
-        if cachedFunction.name != x.name:
-            errors["description warn"] = "known description does not match processed"
+        # if cachedFunction.name != x.name:
+        #     errors["name warn"] = (
+        #         f"known name [{cachedFunction.name}], new name [{x.name}]"
+        #     )
+        # if cachedFunction.description != x.description:
+        #     errors["description warn"] = "known description does not match processed"
 
         if len(errors):
             LOGGER.warning(
-                f"[{process.__qualname__}] Function fields does not match known, Component name [%s], uuid [%s], model name [%s], uuid [%s]",
+                f"[{process.__qualname__}] Fields does not match recorded, element uuid [%s], model name [%s], uuid [%s], warnings [%s]",
                 x.name,
                 x.uuid,
                 x._model.name,
                 x._model.uuid,
-                extra=errors,
+                errors,
             )
 
     return True

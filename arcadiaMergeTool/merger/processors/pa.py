@@ -8,14 +8,14 @@ LOGGER = getLogger(__name__)
 
 @process.register
 def _(
-    x: pa.PhysicalComponentPkg,
+    x: pa.PhysicalComponentPkg | pa.PhysicalFunctionPkg,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ) -> bool:
     LOGGER.debug(
-        f"[{process.__qualname__}] processing physical component package [%s], class [%s], uuid [%s], model name [%s], uuid [%s]",
+        f"[{process.__qualname__}] create root entry for package [%s], class [%s], uuid [%s], model name [%s], uuid [%s]",
         x.name,
         x.__class__,
         x.uuid,
@@ -24,28 +24,12 @@ def _(
     )
 
     if mapping.get((x._model.uuid, x.uuid)) is None:
-        mapping[(x._model.uuid, x.uuid)] = (dest.model.pa.component_pkg, False)
-
-    return True
-
-@process.register
-def _(
-    x: pa.PhysicalFunctionPkg,
-    dest: CapellaMergeModel,
-    src: CapellaMergeModel,
-    base: CapellaMergeModel,
-    mapping: MergerElementMappingMap,
-) -> bool:
-    LOGGER.debug(
-        f"[{process.__qualname__}] processing physical function package [%s], class [%s], uuid [%s], model name [%s], uuid [%s]",
-        x.name,
-        x.__class__,
-        x.uuid,
-        x._model.name,
-        x._model.uuid,
-    )
-
-    if mapping.get((x._model.uuid, x.uuid)) is None:
-        mapping[(x._model.uuid, x.uuid)] = (dest.model.pa.function_pkg, False)
+        package = None
+        if isinstance(x, pa.PhysicalComponentPkg):
+            package = dest.model.pa.component_pkg
+        elif isinstance(x, pa.PhysicalFunctionPkg):
+            package = dest.model.sa.function_pkg
+        
+        mapping[(x._model.uuid, x.uuid)] = (package, False)
 
     return True

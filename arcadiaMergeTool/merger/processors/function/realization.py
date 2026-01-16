@@ -12,24 +12,24 @@ LOGGER = getLogger(__name__)
 
 @process.register
 def _(
-    x: mm.fa.ComponentFunctionalAllocation,
+    x: mm.fa.FunctionRealization,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ) -> bool:
-    """Find and merge Function Allocations
+    """Find and merge Function Realizations
 
     Parameters
     ==========
     x:
-        Function Allocation to process
+        Function Realization to process
     dest:
-        Destination model to add Function Allocations to
+        Destination model to add Function Realizations to
     src:
-        Source model to take Function Allocations from
+        Source model to take Function Realizations from
     base:
-        Base model to check Function Allocations against
+        Base model to check Function Realizations against
     mapping:
         Full mapping of the elements to the corresponding models
 
@@ -42,7 +42,7 @@ def _(
 
     if cachedElement is None:
         LOGGER.debug(
-            f"[{process.__qualname__}] New Function Allocation found, uuid [%s], model name [%s], uuid [%s]",
+            f"[{process.__qualname__}] New Function Realization found, uuid [%s], model name [%s], uuid [%s]",
             x.uuid,
             x._model.name,
             x._model.uuid,
@@ -62,7 +62,7 @@ def _(
         try:
             destParent = mapping[modelParent._model.uuid, modelParent.uuid][0] # pyright: ignore[reportAttributeAccessIssue] expect ModelElement here with valid uuid
         except Exception as ex:
-            LOGGER.fatal(f"[{process.__qualname__}] Function Allocation parent was not found in cache, uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
+            LOGGER.fatal(f"[{process.__qualname__}] Function Realization parent was not found in cache, uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
                 x.uuid,
                 x.__class__,
                 modelParent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
@@ -76,16 +76,14 @@ def _(
 
         targetCollection = None
 
-        if (isinstance(destParent, mm.oa.Entity)
-            or isinstance(destParent, mm.cs.Component)
-            or isinstance(destParent, mm.pa.PhysicalComponent)
-            or isinstance(destParent, mm.sa.SystemComponent)
-            or isinstance(destParent, mm.la.LogicalComponent)
+        if (isinstance(destParent, mm.sa.SystemFunction)
+            or isinstance(destParent, mm.pa.PhysicalFunction)
+            or isinstance(destParent, mm.la.LogicalFunction)
         ):
-            targetCollection = destParent.functional_allocations # pyright: ignore[reportAttributeAccessIssue] expect allocated_functions exists
+            targetCollection = destParent.function_realizations
         else:
             LOGGER.fatal(
-                f"[{process.__qualname__}] Function Allocation parent is not a valid parent, Function uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+                f"[{process.__qualname__}] Function Realization parent is not a valid parent, Function uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
                 x.uuid,
                 x.__class__,
                 destParent.name,
@@ -109,7 +107,7 @@ def _(
             mapping[(x._model.uuid, x.uuid)] = (matchingFunction[0], False)
         else:
             LOGGER.debug(
-                f"[{process.__qualname__}] Create new Function Allocation uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+                f"[{process.__qualname__}] Create new Function Realization uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
                 x.uuid,
                 x.parent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
                 x.parent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
@@ -171,5 +169,6 @@ def _(
                 x._model.uuid,
                 errors,
             )
+
 
     return True

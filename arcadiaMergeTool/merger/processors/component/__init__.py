@@ -8,11 +8,12 @@ from arcadiaMergeTool import getLogger
 
 from arcadiaMergeTool.merger.processors._processor import process
 
-from . import exchange, port
+from . import exchange, port, realization
 
 __all__ = [
     "exchange",
-    "port"
+    "port",
+    "realization",
 ]
 
 LOGGER = getLogger(__name__)
@@ -157,7 +158,6 @@ def _(
             # TODO: find a way to copy these properties
             # if not isinstance(newComp, mm.epbs.ConfigurationItem):
             #     newComp.progress_status = x.progress_status
-            #     newComp.status = x.status
             #     newComp.super = x.super
 
             newComp.description = x.description
@@ -171,6 +171,9 @@ def _(
             newComp.sid = x.sid
             newComp.summary = x.summary
 
+            if x.status is not None: # pyright: ignore[reportAttributeAccessIssue] expect status is valid attribute
+                newComp.status = x.status # pyright: ignore[reportAttributeAccessIssue] expect status is valid attribute
+                
             if not isinstance(newComp, mm.la.LogicalComponent):
                 newComp.kind = x.kind
                 newComp.nature = x.nature
@@ -182,21 +185,22 @@ def _(
         (cachedComponent, fromLibrary) = cachedElement
 
         errors = {}
-        if cachedComponent.name != x.name:
-            errors["name warn"] = (
-                f"known name [{cachedComponent.name}], new name [{x.name}]"
-            )
-        if cachedComponent.name != x.name:
-            errors["description warn"] = "known description does not match processed"
+        # if cachedFunction.name != x.name:
+        #     errors["name warn"] = (
+        #         f"known name [{cachedFunction.name}], new name [{x.name}]"
+        #     )
+        # if cachedFunction.description != x.description:
+        #     errors["description warn"] = "known description does not match processed"
 
         if len(errors):
             LOGGER.warning(
-                f"[{process.__qualname__}] Component fields does not match known, Component name [%s], uuid [%s], model name [%s], uuid [%s]",
+                f"[{process.__qualname__}] Fields does not match recorded, element uuid [%s], model name [%s], uuid [%s], warnings [%s]",
                 x.name,
                 x.uuid,
                 x._model.name,
                 x._model.uuid,
-                extra=errors,
+                errors,
             )
+
 
     return True

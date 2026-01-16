@@ -8,28 +8,36 @@ from arcadiaMergeTool import getLogger
 
 from .._processor import process
 
+# from . import allocation, port, realization
+
+# __all__ = [
+#     "allocation",
+#     "port",
+#     "realization"
+# ]
+
 LOGGER = getLogger(__name__)
 
 @process.register
 def _(
-    x: mm.fa.ComponentFunctionalAllocation,
+    x: mm.sa.Capability | mm.oa.OperationalCapability,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ) -> bool:
-    """Find and merge Function Allocations
+    """Find and merge Capabilities
 
     Parameters
     ==========
     x:
-        Function Allocation to process
+        Capability to process
     dest:
-        Destination model to add Function Allocations to
+        Destination model to add Capabilities to
     src:
-        Source model to take Function Allocations from
+        Source model to take Capabilities from
     base:
-        Base model to check Function Allocations against
+        Base model to check Capabilities against
     mapping:
         Full mapping of the elements to the corresponding models
 
@@ -42,7 +50,8 @@ def _(
 
     if cachedElement is None:
         LOGGER.debug(
-            f"[{process.__qualname__}] New Function Allocation found, uuid [%s], model name [%s], uuid [%s]",
+            f"[{process.__qualname__}] New Capability found, name [%s], uuid [%s], model name [%s], uuid [%s]",
+            x.name,
             x.uuid,
             x._model.name,
             x._model.uuid,
@@ -52,17 +61,13 @@ def _(
         modelParent = x.parent  # pyright: ignore[reportAttributeAccessIssue] expect parent is there in valid model
         if not process(modelParent, dest, src, base, mapping):
             return False
-
-        # check source and target and postpone processing if both weren't processed
-        if not (process(x.source, dest, src, base, mapping) # pyright: ignore[reportOptionalMemberAccess] expect source is there
-            and process(x.target, dest, src, base, mapping)): # pyright: ignore[reportOptionalMemberAccess] expect sotargeturce is there
-            return False
-
+        
         destParent = None
         try:
             destParent = mapping[modelParent._model.uuid, modelParent.uuid][0] # pyright: ignore[reportAttributeAccessIssue] expect ModelElement here with valid uuid
         except Exception as ex:
-            LOGGER.fatal(f"[{process.__qualname__}] Function Allocation parent was not found in cache, uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
+            LOGGER.fatal(f"[{process.__qualname__}] Capability parent was not found in cache, name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
+                x.name,
                 x.uuid,
                 x.__class__,
                 modelParent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
@@ -76,16 +81,26 @@ def _(
 
         targetCollection = None
 
-        if (isinstance(destParent, mm.oa.Entity)
-            or isinstance(destParent, mm.cs.Component)
-            or isinstance(destParent, mm.pa.PhysicalComponent)
-            or isinstance(destParent, mm.sa.SystemComponent)
-            or isinstance(destParent, mm.la.LogicalComponent)
+        if (isinstance(modelParent, mm.sa.CapabilityPkg) 
+            ) and modelParent.capabilities[0] == x:
+            # HACK: assume Root Capability is a very first root component
+            # map system to system and assume it's done
+            mapping[(x._model.uuid, x.uuid)] = (destParent.capabilities, False)
+            return True
+        elif isinstance(modelParent, mm.oa.OperationalCapabilityPkg) and modelParent.capabilities[0] == x:
+            # HACK: assume Root Activity is a very first root component
+            # map system to system and assume it's done
+            mapping[(x._model.uuid, x.uuid)] = (destParent.capabilities[0], False)
+            return True
+        elif (isinstance(destParent, mm.oa.OperationalCapabilityPkg)
+            or isinstance(destParent, mm.sa.CapabilityPkg)
         ):
-            targetCollection = destParent.functional_allocations # pyright: ignore[reportAttributeAccessIssue] expect allocated_functions exists
+            targetCollection = destParent.capabilities
+        # elif isinstance(destParent, mm.oa.)
         else:
             LOGGER.fatal(
-                f"[{process.__qualname__}] Function Allocation parent is not a valid parent, Function uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+                f"[{process.__qualname__}] Capability parent is not a valid parent, Capability name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+                x.name,
                 x.uuid,
                 x.__class__,
                 destParent.name,
@@ -94,22 +109,20 @@ def _(
                 x._model.name,
                 x._model.uuid,
             )
+            print(modelParent, destParent)
             exit(str(ExitCodes.MergeFault))
 
-        mappedSource = mapping.get((x._model.uuid, x.source.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect source is already there
-        mappedTarget = mapping.get((x._model.uuid, x.target.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect target is already there
-        if mappedSource is None or mappedTarget is None:
-            # if source or target is not mapped, postpone allocation processing
-            return False
-        
-        matchingFunction = list(filter(lambda y: y.source == mappedSource[0] and x.target == mappedTarget[0], targetCollection)) # pyright: ignore[reportOptionalSubscript] check for none is above, mappedSource and mappedTarget are safe
+        # use weak match by name
+        # TODO: implement strong match by PVMT properties
+        matchingCapability = list(filter(lambda y: y.name == x.name, targetCollection))
 
-        if (len(matchingFunction) > 0):
+        if (len(matchingCapability) > 0):
             # assume it's same to take first, but theme might be more
-            mapping[(x._model.uuid, x.uuid)] = (matchingFunction[0], False)
+            mapping[(x._model.uuid, x.uuid)] = (matchingCapability[0], False)
         else:
             LOGGER.debug(
-                f"[{process.__qualname__}] Create new Function Allocation uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+                f"[{process.__qualname__}] Create new Capability name [%s], uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+                x.name,
                 x.uuid,
                 x.parent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
                 x.parent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
@@ -123,36 +136,33 @@ def _(
 
             newComp = targetCollection.create(xtype=helpers.qtype_of(x._element)) 
 
-            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            # Unknown fault creates broken Physical Architecture allocation
-            # TODO: fix and eliminate
-            if newComp.layer.name == "Physical Architecture":
-                return True
-
             # TODO: fix PVMT
-            # .applied_property_value_groups = []
+            # .applied_property_value_groups = 
             # .applied_property_values = []
-            # .property_value_groups = []
+            # .property_value_groups = [0]
+            # .property_value_pkgs = []
             # .property_values = []
             # .pvmt = 
-
-            newComp.source = mappedSource[0]
-            newComp.target = mappedTarget[0]
 
             newComp.description = x.description
             newComp.is_visible_in_doc = x.is_visible_in_doc
             newComp.is_visible_in_lm = x.is_visible_in_lm
+            newComp.name = x.name
             newComp.review = x.review
             newComp.sid = x.sid
             newComp.summary = x.summary
 
             if x.status is not None:
                 newComp.status = x.status
+            if x.postcondition is not None:
+                newComp.postcondition = x.postcondition
+            if x.precondition is not None:
+                newComp.precondition = x.precondition
 
             mapping[(x._model.uuid, x.uuid)] = (newComp, False)
 
     else:
-        (cachedFunctionAllication, fromLibrary) = cachedElement
+        (cachedCapability, fromLibrary) = cachedElement
 
         errors = {}
         # if cachedFunction.name != x.name:
@@ -171,5 +181,6 @@ def _(
                 x._model.uuid,
                 errors,
             )
+
 
     return True

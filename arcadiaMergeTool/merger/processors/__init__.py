@@ -7,6 +7,7 @@ from . import la
 from . import oa
 from . import pa
 from . import sa
+from . import capability
 from . import component
 from . import function
 from . import functional
@@ -15,6 +16,7 @@ from . import _part
 LOGGER = getLogger(__name__)
 
 __all__ = [
+    "capability",
     "component",
     "function",
     "functional",

@@ -290,21 +290,21 @@ def _(
         (cachedComponent, fromLibrary) = cachedElement
 
         errors = {}
-        if cachedComponent.name != x.name:
-            errors["name warn"] = (
-                f"known name [{cachedComponent.name}], new name [{x.name}]"
-            )
-        if cachedComponent.name != x.name:
-            errors["description warn"] = "known description does not match processed"
+        # if cachedFunction.name != x.name:
+        #     errors["name warn"] = (
+        #         f"known name [{cachedFunction.name}], new name [{x.name}]"
+        #     )
+        # if cachedFunction.description != x.description:
+        #     errors["description warn"] = "known description does not match processed"
 
         if len(errors):
             LOGGER.warning(
-                f"[{process.__qualname__}] Component Port fields does not match known, Component Port name [%s], uuid [%s], model name [%s], uuid [%s]",
+                f"[{process.__qualname__}] Fields does not match recorded, element uuid [%s], model name [%s], uuid [%s], warnings [%s]",
                 x.name,
                 x.uuid,
                 x._model.name,
                 x._model.uuid,
-                extra=errors,
+                errors,
             )
 
     return True
