@@ -7,30 +7,30 @@ from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
 
-from arcadiaMergeTool.merger.processors._processor import process
+from .._processor import process
 
 LOGGER = getLogger(__name__)
 
 @process.register
 def _(
-    x: mm.sa.CapabilityInvolvement,
+    x: mm.fa.ComponentFunctionalAllocation,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ) -> bool:
-    """Find and merge Capability Involvement
+    """Find and merge Function Allocations
 
     Parameters
     ==========
     x:
-        Capability Involvement to process
+        Function Allocation to process
     dest:
-        Destination model to add Capability Involvement to
+        Destination model to add Function Allocations to
     src:
-        Source model to take Capability Involvement from
+        Source model to take Function Allocations from
     base:
-        Base model to check Capability Involvement against
+        Base model to check Function Allocations against
     mapping:
         Full mapping of the elements to the corresponding models
 
@@ -63,12 +63,16 @@ def _(
 
     targetCollection = None
 
-    if (isinstance(destParent, mm.sa.Capability)
+    if (isinstance(destParent, mm.oa.Entity)
+        or isinstance(destParent, mm.cs.Component)
+        or isinstance(destParent, mm.pa.PhysicalComponent)
+        or isinstance(destParent, mm.sa.SystemComponent)
+        or isinstance(destParent, mm.la.LogicalComponent)
     ):
-        targetCollection = destParent.involvements
+        targetCollection = destParent.functional_allocations # pyright: ignore[reportAttributeAccessIssue] expect allocated_functions exists
     else:
         LOGGER.fatal(
-            f"[{process.__qualname__}] Capability Involvement parent is not a valid parent, Capability Involvement uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+            f"[{process.__qualname__}] Function Allocation parent is not a valid parent, Function uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
             x.uuid,
             x.__class__,
             destParent.name,
@@ -79,20 +83,20 @@ def _(
         )
         exit(str(ExitCodes.MergeFault))
 
-    mappedSource = mapping.get((x._model.uuid, x.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue] expect parent has uuid
-    mappedTarget = mapping.get((x._model.uuid, x.involved.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect involved is already there
+    mappedSource = mapping.get((x._model.uuid, x.source.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect source is already there
+    mappedTarget = mapping.get((x._model.uuid, x.target.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect target is already there
     if mappedSource is None or mappedTarget is None:
         # if source or target is not mapped, postpone allocation processing
         return False
     
-    matchingPort = list(filter(lambda y: y.parent == mappedSource[0] and x.involved == mappedTarget[0], targetCollection)) # pyright: ignore[reportOptionalSubscript] check for none is above, mappedSource and mappedTarget are safe
+    matchingFunction = list(filter(lambda y: y.source == mappedSource[0] and x.target == mappedTarget[0], targetCollection)) # pyright: ignore[reportOptionalSubscript] check for none is above, mappedSource and mappedTarget are safe
 
-    if (len(matchingPort) > 0):
+    if (len(matchingFunction) > 0):
         # assume it's same to take first, but theme might be more
-        mapping[(x._model.uuid, x.uuid)] = (matchingPort[0], False)
+        mapping[(x._model.uuid, x.uuid)] = (matchingFunction[0], False)
     else:
         LOGGER.debug(
-            f"[{process.__qualname__}] Create new Capability Involvement uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+            f"[{process.__qualname__}] Create new Function Allocation uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
             x.uuid,
             x.parent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
             x.parent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
@@ -105,7 +109,8 @@ def _(
         )
 
         newComp = targetCollection.create(xtype=helpers.qtype_of(x._element),
-            involved = mappedTarget[0],
+            source = mappedSource[0],
+            target = mappedTarget[0],
             description = x.description,
             is_visible_in_doc = x.is_visible_in_doc,
             is_visible_in_lm = x.is_visible_in_lm,

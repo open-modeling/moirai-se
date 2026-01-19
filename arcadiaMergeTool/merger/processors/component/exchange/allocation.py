@@ -104,9 +104,6 @@ def _(
             x._model.uuid,
         )
 
-        print(x)
-        exit()
-
         newComp = targetCollection.create(xtype=helpers.qtype_of(x._element),
             source = mappedSource[0],
             target = mappedTarget[0],

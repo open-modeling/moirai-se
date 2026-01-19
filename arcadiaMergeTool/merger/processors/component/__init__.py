@@ -1,20 +1,19 @@
 import capellambse.metamodel as mm
 from capellambse import helpers
-from capellambse.model import ModelElement
 
 from arcadiaMergeTool.helpers import ExitCodes
-from . import exchange
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
 
 from arcadiaMergeTool.merger.processors._processor import process
 
-from . import port, realization
+from . import exchange, port, physical, realization
 
 __all__ = [
     "exchange",
     "port",
+    "physical",
     "realization",
 ]
 

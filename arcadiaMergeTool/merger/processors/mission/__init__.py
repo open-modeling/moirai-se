@@ -1,36 +1,42 @@
 import capellambse.metamodel as mm
 from capellambse import helpers
-from capellambse.model import ModelElement
 
 from arcadiaMergeTool.helpers import ExitCodes
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
 
-from arcadiaMergeTool.merger.processors._processor import process
+from .._processor import process
+
+from . import allocation, involvement
+
+__all__ = [
+    "allocation",
+    "involvement",
+]
 
 LOGGER = getLogger(__name__)
 
 @process.register
 def _(
-    x: mm.sa.CapabilityInvolvement,
+    x: mm.sa.Mission,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ) -> bool:
-    """Find and merge Capability Involvement
+    """Find and merge Missions
 
     Parameters
     ==========
     x:
-        Capability Involvement to process
+        Capability to process
     dest:
-        Destination model to add Capability Involvement to
+        Destination model to add Missions to
     src:
-        Source model to take Capability Involvement from
+        Source model to take Missions from
     base:
-        Base model to check Capability Involvement against
+        Base model to check Missions against
     mapping:
         Full mapping of the elements to the corresponding models
 
@@ -48,7 +54,8 @@ def _(
     
     destParentEntry = mapping.get((modelParent._model.uuid, modelParent.uuid)) # pyright: ignore[reportAttributeAccessIssue] expect ModelElement here with valid uuid
     if destParentEntry is None:
-        LOGGER.fatal(f"[{process.__qualname__}] Element parent was not found in cache, uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
+        LOGGER.fatal(f"[{process.__qualname__}] Element parent was not found in cache, name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
+            x.name,
             x.uuid,
             x.__class__,
             modelParent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
@@ -63,12 +70,14 @@ def _(
 
     targetCollection = None
 
-    if (isinstance(destParent, mm.sa.Capability)
+    if (isinstance(destParent, mm.sa.MissionPkg)
+          or isinstance(destParent, mm.sa.Mission)
     ):
-        targetCollection = destParent.involvements
+        targetCollection = destParent.missions
     else:
         LOGGER.fatal(
-            f"[{process.__qualname__}] Capability Involvement parent is not a valid parent, Capability Involvement uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+            f"[{process.__qualname__}] Capability parent is not a valid parent, Capability name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+            x.name,
             x.uuid,
             x.__class__,
             destParent.name,
@@ -79,20 +88,17 @@ def _(
         )
         exit(str(ExitCodes.MergeFault))
 
-    mappedSource = mapping.get((x._model.uuid, x.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue] expect parent has uuid
-    mappedTarget = mapping.get((x._model.uuid, x.involved.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect involved is already there
-    if mappedSource is None or mappedTarget is None:
-        # if source or target is not mapped, postpone allocation processing
-        return False
-    
-    matchingPort = list(filter(lambda y: y.parent == mappedSource[0] and x.involved == mappedTarget[0], targetCollection)) # pyright: ignore[reportOptionalSubscript] check for none is above, mappedSource and mappedTarget are safe
+    # use weak match by name
+    # TODO: implement strong match by PVMT properties
+    matchingCapability = list(filter(lambda y: y.name == x.name, targetCollection))
 
-    if (len(matchingPort) > 0):
+    if (len(matchingCapability) > 0):
         # assume it's same to take first, but theme might be more
-        mapping[(x._model.uuid, x.uuid)] = (matchingPort[0], False)
+        mapping[(x._model.uuid, x.uuid)] = (matchingCapability[0], False)
     else:
         LOGGER.debug(
-            f"[{process.__qualname__}] Create new Capability Involvement uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+            f"[{process.__qualname__}] Create new Capability name [%s], uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+            x.name,
             x.uuid,
             x.parent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
             x.parent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
@@ -105,19 +111,20 @@ def _(
         )
 
         newComp = targetCollection.create(xtype=helpers.qtype_of(x._element),
-            involved = mappedTarget[0],
             description = x.description,
             is_visible_in_doc = x.is_visible_in_doc,
             is_visible_in_lm = x.is_visible_in_lm,
+            name = x.name,
             review = x.review,
             sid = x.sid,
             summary = x.summary,
         ) 
 
         # TODO: fix PVMT
-        # .applied_property_value_groups = []
+        # .applied_property_value_groups = 
         # .applied_property_values = []
-        # .property_value_groups = []
+        # .property_value_groups = [0]
+        # .property_value_pkgs = []
         # .property_values = []
         # .pvmt = 
 

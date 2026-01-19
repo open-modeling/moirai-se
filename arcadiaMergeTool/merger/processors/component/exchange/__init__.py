@@ -10,54 +10,63 @@ from arcadiaMergeTool import getLogger
 
 from arcadiaMergeTool.merger.processors._processor import process
 
-# from . import allocation
+from . import allocation
 
 __all__ = [
-    # "allocation",
+    "allocation",
 ]
-
 
 LOGGER = getLogger(__name__)
 
-def __findMatchingExchange(coll, exch, mappedSourceCompEntry: MergerElementMappingEntry, mappedTargetCompEntry: MergerElementMappingEntry, mapping: MergerElementMappingMap) -> m._obj.ModelElement | None:
-    """Find port basen on exchange props
+def __findMatchingExchange(targetCollection, srcExch, 
+                           mappedSourcFuncEntry: MergerElementMappingEntry | None, 
+                           mappedTargetFuncEntry: MergerElementMappingEntry | None, 
+                           mapping: MergerElementMappingMap) -> ModelElement | bool:
+    """Find Comp basen on exchange props
     
     Parameters
     ==========
-    coll:
+    targetCollection:
         Exchange collection to lookup at
-    exch:
+    srcExch:
         Exchange to match against
 
     Returns
     =======
-    Matching port or None
+    Matching Comp or None
     """
-    exchMap = mapping.get((exch._model.uuid), exch.uuid)
-    mappedExch = exchMap[0] if exchMap is not None else None
+    srcExchMapping = mapping.get((srcExch._model.uuid, srcExch.uuid))
+    srcExchMappedExch = srcExchMapping[0] if srcExchMapping is not None else None
 
-    (mappedSourceComp, sourceFromLib) =  mappedSourceCompEntry
-    (mappedTargetComp, targerFromLib) =  mappedTargetCompEntry
+    if srcExchMappedExch is not None:
+        # for already mapped exchanges no need no do something
+        return srcExchMappedExch
 
+    for tgtExch in targetCollection:
 
-    for ex in coll:
         # NOTE: weak match against exchange name
         # TODO: replace weak match with PVMT based strong match
-        if ex.name == exch.name:
-            exMap = mapping.get((ex._model.uuid, ex.uuid))
-            mappedEx = exMap[0] if exMap is not None else None
-            if exMap is not None and mappedExch == mappedEx:
-                # if already mapped, use it
-                return ex
-            
-            if ex.source is None and ex.target is None and mappedEx is None:
-                # unassigned and unmapped exchange, impossible case but get one
-                return ex
-            
-            if ex.source.parent == mappedSourceComp and ex.target.parent == mappedTargetComp:
-                # matching exchange round
-                return ex
+        if tgtExch.name == srcExch.name:
+            # for case of name we have to do complex check
+            # 1. there might be several exchanges with the same name
+            # 2. exchange is mapped before Comp and may have empty source and target
 
+            if tgtExch.source is None or tgtExch.target is None:
+                # when one of ports is not mapped, don't create twins in same collection
+                # otherwise it will not be possible to distict one exchange from another
+                # we might be facing potentinal twin exchange, but need to postpone processing
+                # True means that exchange processing must be postponed
+                return True
+
+            tgtExchMappedSourceFunc = mapping.get((tgtExch._model.uuid, tgtExch.source.parent.uuid))
+            tgtExchMappedTargetFunc = mapping.get((tgtExch._model.uuid, tgtExch.target.parent.uuid))
+
+            if tgtExchMappedSourceFunc is not None and tgtExchMappedTargetFunc is not None and tgtExchMappedSourceFunc == mappedSourcFuncEntry and tgtExchMappedTargetFunc == mappedTargetFuncEntry:
+                # if name, source function and target function are equal, map existing exchange to a candidate
+                return tgtExch
+
+    # if collection is exceeded, allow to add new exchange
+    return False
 
 @process.register
 def _(
@@ -144,9 +153,10 @@ def _(
     # 
     # In both cases - iterate through the exchanges and match them by name
 
-    sourceComponentPortMap = mapping.get((x.source._model.uuid, x.source.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect source exists in this context
+    process(x.source, dest, src, base, mapping)
+    process(x.target, dest, src, base, mapping)
+
     sourceComponentMap = mapping.get((x.source.parent._model.uuid, x.source.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect source exists in this context
-    targetComponentPortMap = mapping.get((x.target._model.uuid, x.target.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect target exists in this context
     targetComponentMap = mapping.get((x.target.parent._model.uuid, x.target.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect target exists in this context
 
     if sourceComponentMap is None or targetComponentMap is None:
@@ -154,7 +164,20 @@ def _(
         return False
 
     ex = __findMatchingExchange(targetCollection, x, sourceComponentMap, targetComponentMap, mapping)
-    if ex is not None:
+
+    if ex is True:
+        # postpone exececution on boolean true
+        # TODO: add more convenient return type
+        LOGGER.debug(
+            f"[{process.__qualname__}] No Component Exchange match, postpone processing of Component Exchange name [%s], uuid [%s], model name [%s], uuid [%s]",
+            x.name,
+            x.uuid,
+            x._model.name,
+            x._model.uuid,
+        )
+        return False
+
+    if ex is not False:
         # coming here means that component exchange was added in a project, not taken from the library
         LOGGER.error(
             f"[{process.__qualname__}] Non-library component exchange detected. Component exchange name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
@@ -189,13 +212,6 @@ def _(
             summary = x.summary,
     ) 
 
-        # if x.layer.name == "System Architecture" and x.layer.parent.name == "Steering-fl":
-        #         print ("!!!!!!!!!!!!!!!!!!!!!!!!", x)
-        #         print ("$$$$$$$$$$$$$$$$$$$$$$$$", newComp)
-        #         # print ("@@@@@@@@@@@@@@@@@@@@@@@@", x.parent)
-        #         # print ("########################", x.layer)
-        #         exit()
-
         # TODO: fix PVMT
         # .property_value_groups = []
         # .property_values = []
@@ -206,10 +222,12 @@ def _(
 
         if x.status is not None:
             newComp.status = x.status
-        if sourceComponentPortMap is not None:
-            newComp.source = sourceComponentPortMap # pyright: ignore[reportAttributeAccessIssue] expect source exists on model
-        if targetComponentPortMap is not None:
-            newComp.target = targetComponentPortMap # pyright: ignore[reportAttributeAccessIssue] expect source exists on model
+            
+        # NOTE: do not assign ports, port assignment logic is in function/port
+        # if sourceComponentPortMap is not None:
+        #     newComp.source = sourceComponentPortMap # pyright: ignore[reportAttributeAccessIssue] expect source exists on model
+        # if targetComponentPortMap is not None:
+        #     newComp.target = targetComponentPortMap # pyright: ignore[reportAttributeAccessIssue] expect source exists on model
 
         mapping[(x._model.uuid, x.uuid)] = (newComp, False)
 

@@ -1,6 +1,5 @@
 import capellambse.metamodel as mm
 from capellambse import helpers
-from capellambse.model import ModelElement
 
 from arcadiaMergeTool.helpers import ExitCodes
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
@@ -13,24 +12,24 @@ LOGGER = getLogger(__name__)
 
 @process.register
 def _(
-    x: mm.sa.CapabilityInvolvement,
+    x: mm.sa.MissionInvolvement,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ) -> bool:
-    """Find and merge Capability Involvement
+    """Find and merge Mission Involvement
 
     Parameters
     ==========
     x:
-        Capability Involvement to process
+        Mission Involvement to process
     dest:
-        Destination model to add Capability Involvement to
+        Destination model to add Mission Involvement to
     src:
-        Source model to take Capability Involvement from
+        Source model to take Mission Involvement from
     base:
-        Base model to check Capability Involvement against
+        Base model to check Mission Involvement against
     mapping:
         Full mapping of the elements to the corresponding models
 
@@ -63,12 +62,12 @@ def _(
 
     targetCollection = None
 
-    if (isinstance(destParent, mm.sa.Capability)
+    if (isinstance(destParent, mm.sa.Mission)
     ):
         targetCollection = destParent.involvements
     else:
         LOGGER.fatal(
-            f"[{process.__qualname__}] Capability Involvement parent is not a valid parent, Capability Involvement uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+            f"[{process.__qualname__}] Mission Involvement parent is not a valid parent, Mission Involvement uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
             x.uuid,
             x.__class__,
             destParent.name,
@@ -79,7 +78,7 @@ def _(
         )
         exit(str(ExitCodes.MergeFault))
 
-    mappedSource = mapping.get((x._model.uuid, x.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue] expect parent has uuid
+    mappedSource = mapping.get((x._model.uuid, x.parent.uuid))  # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
     mappedTarget = mapping.get((x._model.uuid, x.involved.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect involved is already there
     if mappedSource is None or mappedTarget is None:
         # if source or target is not mapped, postpone allocation processing
@@ -92,7 +91,7 @@ def _(
         mapping[(x._model.uuid, x.uuid)] = (matchingPort[0], False)
     else:
         LOGGER.debug(
-            f"[{process.__qualname__}] Create new Capability Involvement uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+            f"[{process.__qualname__}] Create new Mission Involvement uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
             x.uuid,
             x.parent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
             x.parent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there

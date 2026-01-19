@@ -1,6 +1,4 @@
 from collections import deque
-import os
-import typing as t
 
 from arcadiaMergeTool import getLogger
 from arcadiaMergeTool.helpers import ExitCodes
@@ -10,9 +8,8 @@ from capellambse.model import ModelElement
 import capellambse.model as m
 import capellambse.metamodel as mm
 import capellambse.metamodel.re as re
-import capellambse.metamodel.capellamodeller as cm
 import capellambse.metamodel.libraries as li
-from arcadiaMergeTool.merger.processors import process
+from arcadiaMergeTool.merger.processors import doProcess
 
 LOGGER = getLogger(name=__name__)
 
@@ -30,9 +27,6 @@ def _makeModelElementList(
     =======
     Filtered list of found objects
     """
-
-    # print (list(model.model.search(mm.fa.ComponentFunctionalAllocation, below=model.model.project)),)
-    # exit()
 
     # TODO: models can be huge, use generators to iterate through the model
     lst = deque(
@@ -73,75 +67,31 @@ def mergeElements(
     LOGGER.info(f"[{mergeElements.__qualname__}] begin merging models into target model")
 
     for model in src:
-        list = _makeModelElementList(model)  # ,  mm.capellacommon.Region
+        list: deque[ModelElement | tuple[ModelElement, int]] = _makeModelElementList(model) # pyright: ignore[reportAssignmentType] TODO: add contravatiant
 
         while list:
             elem = list.pop()
+            counter = 1
+            if isinstance(elem, tuple):
+                (elem, counter) =elem
+
+            if counter > 50:
+                # TODO: make configurable, sometimes it takes up to 20 retries to complete merge
+                if isinstance(elem, mm.modellingcore.AbstractNamedElement):
+                    LOGGER.fatal(f"[{mergeElements.__qualname__}] Processing retry threshold exceeded [%s], element name [%s], uuid [%s], class [%s], model [%s]; queue length [%s]", counter, elem.name, elem.uuid, elem.__class__, elem._model.name, len(list)) # type: ignore
+                else:
+                    LOGGER.fatal(f"[{mergeElements.__qualname__}] Processing retry threshold exceeded [%s], element uuid [%s], class [%s], model [%s]; queue length [%s]", counter, elem.uuid, elem.__class__, elem._model.name, len(list)) # type: ignore
+                exit(str(ExitCodes.MergeFault))
+
             if isinstance(elem, mm.modellingcore.AbstractNamedElement):
-                LOGGER.debug(f"[{mergeElements.__qualname__}] Process element name [%s], uuid [%s], class [%s], model [%s]; queue length [%s]", elem.name, elem.uuid, elem.__class__, elem._model.name, len(list)) # type: ignore
+                LOGGER.debug(f"[{mergeElements.__qualname__}] Process element name [%s], uuid [%s], class [%s], model [%s]; queue length [%s], try [%s]", elem.name, elem.uuid, elem.__class__, elem._model.name, len(list), counter) # type: ignore
             else:
-                LOGGER.debug(f"[{mergeElements.__qualname__}] Process element uuid [%s], class [%s], model [%s]; queue length [%s]", elem.uuid, elem.__class__, elem._model.name, len(list)) # type: ignore
-            res = __doProcess(elem, dest, model, base, mapping)
+                LOGGER.debug(f"[{mergeElements.__qualname__}] Process element uuid [%s], class [%s], model [%s]; queue length [%s], try [%s]", elem.uuid, elem.__class__, elem._model.name, len(list), counter) # type: ignore
+            res = doProcess(elem, dest, model, base, mapping)
             if not res:
                 if isinstance(elem, mm.modellingcore.AbstractNamedElement):
                     LOGGER.debug(f"[{mergeElements.__qualname__}] element name [%s], uuid [%s], class [%s], model [%s] put back to queue", elem.name, elem.uuid, elem.__class__, elem._model.name) # type: ignore
                 else:
                     LOGGER.debug(f"[{mergeElements.__qualname__}] element uuid [%s], class [%s], model [%s] put back to queue", elem.uuid, elem.__class__, elem._model.name) # type: ignore
-                list.appendleft(elem)
+                list.appendleft((elem, counter+1))
 
-def __doProcess (
-    x: ModelElement,
-    dest: CapellaMergeModel,
-    src: CapellaMergeModel,
-    base: CapellaMergeModel,
-    mapping: MergerElementMappingMap,
-) -> bool:
-
-    if x == x._model.project:
-        # edge case, root node reached
-        mapping[(x._model.uuid, x.uuid)] = (x, False)
-
-    cachedElement = mapping.get((x._model.uuid, x.uuid))
-
-    if cachedElement is None:
-        if isinstance(x, mm.capellacore.NamedElement):
-            LOGGER.debug(
-                f"[{process.__qualname__}] Add new element to model name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
-                x.name,
-                x.uuid,
-                x.__class__,
-                x._model.name,
-                x._model.uuid,
-            )
-        else:
-            LOGGER.debug(
-                f"[{process.__qualname__}] Add new element to model uuid [%s], class [%s], model name [%s], uuid [%s]",
-                x.uuid,
-                x.__class__,
-                x._model.name,
-                x._model.uuid,
-            )
-
-        return process(x, dest, src, base, mapping)
-
-    else:
-        (cachedFunction, fromLibrary) = cachedElement
-
-        errors = []
-        # if cachedFunction.name != x.name:
-        #     errors["name warn"] = (
-        #         f"known name [{cachedFunction.name}], new name [{x.name}]"
-        #     )
-        # if cachedFunction.description != x.description:
-        #     errors["description warn"] = "known description does not match processed"
-
-        if len(errors):
-            LOGGER.warning(
-                f"[{process.__qualname__}] Fields does not match recorded, element uuid [%s], model name [%s], uuid [%s], warnings [%s]",
-                x.uuid,
-                x._model.name,
-                x._model.uuid,
-                errors,
-            )
-
-    return True

@@ -1,6 +1,5 @@
 import capellambse.metamodel as mm
 from capellambse import helpers
-from capellambse.model import ModelElement
 
 from arcadiaMergeTool.helpers import ExitCodes
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
@@ -9,11 +8,11 @@ from arcadiaMergeTool import getLogger
 
 from .._processor import process
 
-from . import realization # allocation, port, 
+from . import exploitation, realization, involvement
 
 __all__ = [
-    # "allocation",
-    # "port",
+    "exploitation",
+    "involvement",
     "realization"
 ]
 
@@ -72,18 +71,10 @@ def _(
 
     targetCollection = None
 
-    if (isinstance(destParent, mm.sa.CapabilityPkg) 
-        or isinstance(destParent, mm.oa.OperationalCapabilityPkg)
-    ) and x.parent.capabilities[0] == x: # pyright: ignore[reportAttributeAccessIssue] expect capabilities are there
-        # HACK: assume Root Capavbility is a very first root component
-        # map system to system and assume it's done
-        mapping[(x._model.uuid, x.uuid)] = (destParent.capabilities[0], False)
-        return True
-    elif (isinstance(destParent, mm.oa.OperationalCapabilityPkg)
+    if (isinstance(destParent, mm.oa.OperationalCapabilityPkg)
         or isinstance(destParent, mm.sa.CapabilityPkg)
     ):
         targetCollection = destParent.capabilities
-    # elif isinstance(destParent, mm.oa.)
     else:
         LOGGER.fatal(
             f"[{process.__qualname__}] Capability parent is not a valid parent, Capability name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
