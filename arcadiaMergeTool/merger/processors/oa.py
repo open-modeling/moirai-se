@@ -1,5 +1,6 @@
 from arcadiaMergeTool.merger.processors._processor import process
 from capellambse.metamodel import oa
+from capellambse.model import ModelElement
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
@@ -8,7 +9,7 @@ LOGGER = getLogger(__name__)
 
 @process.register
 def _(
-    x: oa.OperationalActivityPkg | oa.OperationalCapabilityPkg,
+    x: oa.OperationalActivityPkg | oa.OperationalCapabilityPkg | oa.OperationalAnalysis,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
@@ -25,10 +26,12 @@ def _(
 
     if mapping.get((x._model.uuid, x.uuid)) is None:
         package = None
-        if isinstance(x, oa.OperationalActivityPkg):
+        if isinstance(x, oa.OperationalAnalysis):
+            package = dest.model.oa
+        elif isinstance(x, oa.OperationalActivityPkg):
             package = dest.model.oa.function_pkg
         elif isinstance(x, oa.OperationalCapabilityPkg):
-            package = dest.model.sa.capability_pkg
+            package = dest.model.oa.capability_pkg
         
         mapping[(x._model.uuid, x.uuid)] = (package, False)
 

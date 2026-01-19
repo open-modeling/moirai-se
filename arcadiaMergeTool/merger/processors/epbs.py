@@ -1,5 +1,6 @@
 from arcadiaMergeTool.merger.processors._processor import process
 from capellambse.metamodel import epbs
+from capellambse.model import ModelElement
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
@@ -8,7 +9,7 @@ LOGGER = getLogger(__name__)
 
 @process.register
 def _(
-    x: epbs.ConfigurationItemPkg,
+    x: epbs.ConfigurationItemPkg | epbs.EPBSArchitecture,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
@@ -24,7 +25,10 @@ def _(
     )
 
     if mapping.get((x._model.uuid, x.uuid)) is None:
-        mapping[(x._model.uuid, x.uuid)] = (dest.model.epbs.configuration_item_pkg, False)
+        if isinstance(x, epbs.EPBSArchitecture):
+            mapping[(x._model.uuid, x.uuid)] = (dest.model.epbs, False)
+        elif isinstance(x, epbs.ConfigurationItemPkg):
+            mapping[(x._model.uuid, x.uuid)] = (dest.model.epbs.configuration_item_pkg, False)
 
     return True
 

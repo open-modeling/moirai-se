@@ -1,44 +1,61 @@
 import capellambse.metamodel as mm
 from capellambse import helpers
-from capellambse.model import ModelElement
-
 from arcadiaMergeTool.helpers import ExitCodes
+from arcadiaMergeTool.merger.processors._processor import process
+from capellambse.metamodel import capellamodeller as ca
+from capellambse.model import ModelElement
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
-
-from .._processor import process
-
-from . import realization # allocation, port, 
-
-__all__ = [
-    # "allocation",
-    # "port",
-    "realization"
-]
 
 LOGGER = getLogger(__name__)
 
 @process.register
 def _(
-    x: mm.sa.Capability | mm.oa.OperationalCapability,
+    x: ca.SystemEngineering,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ) -> bool:
-    """Find and merge Capabilities
+    LOGGER.debug(
+        f"[{process.__qualname__}] create root entry for package [%s], class [%s], uuid [%s], model name [%s], uuid [%s]",
+        x.name,
+        x.__class__,
+        x.uuid,
+        x._model.name,
+        x._model.uuid,
+    )
+
+    if mapping.get((x._model.uuid, x.uuid)) is None:
+        package = None
+        if isinstance(x, ca.SystemEngineering):
+            package = dest.model.project
+        
+        mapping[(x._model.uuid, x.uuid)] = (package, False)
+
+    return True
+
+@process.register
+def _(
+    x: mm.epbs.PhysicalArchitectureRealization | mm.pa.LogicalArchitectureRealization | mm.la.SystemAnalysisRealization | mm.sa.OperationalAnalysisRealization,
+    dest: CapellaMergeModel,
+    src: CapellaMergeModel,
+    base: CapellaMergeModel,
+    mapping: MergerElementMappingMap,
+) -> bool:
+    """Find and merge  Architecture Realizations
 
     Parameters
     ==========
     x:
-        Capability to process
+         Architecture Realization to process
     dest:
-        Destination model to add Capabilities to
+        Destination model to add Architecture Realizations to
     src:
-        Source model to take Capabilities from
+        Source model to take Architecture Realizations from
     base:
-        Base model to check Capabilities against
+        Base model to check Architecture Realizations against
     mapping:
         Full mapping of the elements to the corresponding models
 
@@ -72,22 +89,17 @@ def _(
 
     targetCollection = None
 
-    if (isinstance(destParent, mm.sa.CapabilityPkg) 
-        or isinstance(destParent, mm.oa.OperationalCapabilityPkg)
-    ) and x.parent.capabilities[0] == x: # pyright: ignore[reportAttributeAccessIssue] expect capabilities are there
-        # HACK: assume Root Capavbility is a very first root component
-        # map system to system and assume it's done
-        mapping[(x._model.uuid, x.uuid)] = (destParent.capabilities[0], False)
-        return True
-    elif (isinstance(destParent, mm.oa.OperationalCapabilityPkg)
-        or isinstance(destParent, mm.sa.CapabilityPkg)
-    ):
-        targetCollection = destParent.capabilities
-    # elif isinstance(destParent, mm.oa.)
+    if isinstance(destParent, mm.epbs.EPBSArchitecture):
+        targetCollection = destParent.physical_architecture_realizations
+    elif isinstance(destParent, mm.pa.PhysicalArchitecture):
+        targetCollection = destParent.logical_architecture_realizations
+    elif isinstance(destParent, mm.la.LogicalArchitecture):
+        targetCollection = destParent.system_analysis_realizations
+    elif isinstance(destParent, mm.sa.SystemAnalysis):
+        targetCollection = destParent.operational_analysis_realizations
     else:
         LOGGER.fatal(
-            f"[{process.__qualname__}] Capability parent is not a valid parent, Capability name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
-            x.name,
+            f"[{process.__qualname__}] Architecture Realization parent is not a valid parent, Port uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
             x.uuid,
             x.__class__,
             destParent.name,
@@ -98,17 +110,20 @@ def _(
         )
         exit(str(ExitCodes.MergeFault))
 
-    # use weak match by name
-    # TODO: implement strong match by PVMT properties
-    matchingCapability = list(filter(lambda y: y.name == x.name, targetCollection))
+    mappedSource = mapping.get((x._model.uuid, x.source.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect source is already there
+    mappedTarget = mapping.get((x._model.uuid, x.target.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect target is already there
+    if mappedSource is None or mappedTarget is None:
+        # if source or target is not mapped, postpone allocation processing
+        return False
+    
+    matchingPort = list(filter(lambda y: y.source == mappedSource[0] and x.target == mappedTarget[0], targetCollection)) # pyright: ignore[reportOptionalSubscript] check for none is above, mappedSource and mappedTarget are safe
 
-    if (len(matchingCapability) > 0):
+    if (len(matchingPort) > 0):
         # assume it's same to take first, but theme might be more
-        mapping[(x._model.uuid, x.uuid)] = (matchingCapability[0], False)
+        mapping[(x._model.uuid, x.uuid)] = (matchingPort[0], False)
     else:
         LOGGER.debug(
-            f"[{process.__qualname__}] Create new Capability name [%s], uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
-            x.name,
+            f"[{process.__qualname__}] Create new Architecture Realization uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
             x.uuid,
             x.parent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
             x.parent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
@@ -121,30 +136,27 @@ def _(
         )
 
         newComp = targetCollection.create(xtype=helpers.qtype_of(x._element),
+            source = mappedSource[0],
+            target = mappedTarget[0],
             description = x.description,
             is_visible_in_doc = x.is_visible_in_doc,
             is_visible_in_lm = x.is_visible_in_lm,
-            name = x.name,
             review = x.review,
             sid = x.sid,
             summary = x.summary,
         ) 
 
         # TODO: fix PVMT
-        # .applied_property_value_groups = 
+        # .applied_property_value_groups = []
         # .applied_property_values = []
-        # .property_value_groups = [0]
-        # .property_value_pkgs = []
+        # .property_value_groups = []
         # .property_values = []
         # .pvmt = 
 
         if x.status is not None:
             newComp.status = x.status
-        if x.postcondition is not None:
-            newComp.postcondition = x.postcondition
-        if x.precondition is not None:
-            newComp.precondition = x.precondition
 
         mapping[(x._model.uuid, x.uuid)] = (newComp, False)
+
 
     return True

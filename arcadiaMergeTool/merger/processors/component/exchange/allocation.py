@@ -7,38 +7,30 @@ from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
 
-from .._processor import process
-
-from . import realization # allocation, port, 
-
-__all__ = [
-    # "allocation",
-    # "port",
-    "realization"
-]
+from arcadiaMergeTool.merger.processors._processor import process
 
 LOGGER = getLogger(__name__)
 
 @process.register
 def _(
-    x: mm.sa.Capability | mm.oa.OperationalCapability,
+    x: mm.fa.ComponentExchangeAllocation,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ) -> bool:
-    """Find and merge Capabilities
+    """Find and merge Component Exchange Allocations
 
     Parameters
     ==========
     x:
-        Capability to process
+        Component Exchange Allocation to process
     dest:
-        Destination model to add Capabilities to
+        Destination model to add Component Exchange Allocations to
     src:
-        Source model to take Capabilities from
+        Source model to take Component Exchange Allocations from
     base:
-        Base model to check Capabilities against
+        Base model to check Component Exchange Allocations against
     mapping:
         Full mapping of the elements to the corresponding models
 
@@ -56,8 +48,7 @@ def _(
     
     destParentEntry = mapping.get((modelParent._model.uuid, modelParent.uuid)) # pyright: ignore[reportAttributeAccessIssue] expect ModelElement here with valid uuid
     if destParentEntry is None:
-        LOGGER.fatal(f"[{process.__qualname__}] Element parent was not found in cache, name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
-            x.name,
+        LOGGER.fatal(f"[{process.__qualname__}] Element parent was not found in cache, uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
             x.uuid,
             x.__class__,
             modelParent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
@@ -72,22 +63,12 @@ def _(
 
     targetCollection = None
 
-    if (isinstance(destParent, mm.sa.CapabilityPkg) 
-        or isinstance(destParent, mm.oa.OperationalCapabilityPkg)
-    ) and x.parent.capabilities[0] == x: # pyright: ignore[reportAttributeAccessIssue] expect capabilities are there
-        # HACK: assume Root Capavbility is a very first root component
-        # map system to system and assume it's done
-        mapping[(x._model.uuid, x.uuid)] = (destParent.capabilities[0], False)
-        return True
-    elif (isinstance(destParent, mm.oa.OperationalCapabilityPkg)
-        or isinstance(destParent, mm.sa.CapabilityPkg)
+    if (isinstance(destParent, mm.cs.PhysicalLink)
     ):
-        targetCollection = destParent.capabilities
-    # elif isinstance(destParent, mm.oa.)
+        targetCollection = destParent.component_exchange_allocations # pyright: ignore[reportAttributeAccessIssue] expect allocated_Component Exchanges exists
     else:
         LOGGER.fatal(
-            f"[{process.__qualname__}] Capability parent is not a valid parent, Capability name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
-            x.name,
+            f"[{process.__qualname__}] Component Exchange Allocation parent is not a valid parent, Component Exchange uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
             x.uuid,
             x.__class__,
             destParent.name,
@@ -98,17 +79,20 @@ def _(
         )
         exit(str(ExitCodes.MergeFault))
 
-    # use weak match by name
-    # TODO: implement strong match by PVMT properties
-    matchingCapability = list(filter(lambda y: y.name == x.name, targetCollection))
+    mappedSource = mapping.get((x._model.uuid, x.source.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect source is already there
+    mappedTarget = mapping.get((x._model.uuid, x.target.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect target is already there
+    if mappedSource is None or mappedTarget is None:
+        # if source or target is not mapped, postpone allocation processing
+        return False
+    
+    matchingComponentExchange = list(filter(lambda y: y.source == mappedSource[0] and x.target == mappedTarget[0], targetCollection)) # pyright: ignore[reportOptionalSubscript] check for none is above, mappedSource and mappedTarget are safe
 
-    if (len(matchingCapability) > 0):
+    if (len(matchingComponentExchange) > 0):
         # assume it's same to take first, but theme might be more
-        mapping[(x._model.uuid, x.uuid)] = (matchingCapability[0], False)
+        mapping[(x._model.uuid, x.uuid)] = (matchingComponentExchange[0], False)
     else:
         LOGGER.debug(
-            f"[{process.__qualname__}] Create new Capability name [%s], uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
-            x.name,
+            f"[{process.__qualname__}] Create new Component Exchange Allocation uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
             x.uuid,
             x.parent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
             x.parent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
@@ -120,30 +104,29 @@ def _(
             x._model.uuid,
         )
 
+        print(x)
+        exit()
+
         newComp = targetCollection.create(xtype=helpers.qtype_of(x._element),
+            source = mappedSource[0],
+            target = mappedTarget[0],
             description = x.description,
             is_visible_in_doc = x.is_visible_in_doc,
             is_visible_in_lm = x.is_visible_in_lm,
-            name = x.name,
             review = x.review,
             sid = x.sid,
             summary = x.summary,
         ) 
 
         # TODO: fix PVMT
-        # .applied_property_value_groups = 
+        # .applied_property_value_groups = []
         # .applied_property_values = []
-        # .property_value_groups = [0]
-        # .property_value_pkgs = []
+        # .property_value_groups = []
         # .property_values = []
         # .pvmt = 
 
         if x.status is not None:
             newComp.status = x.status
-        if x.postcondition is not None:
-            newComp.postcondition = x.postcondition
-        if x.precondition is not None:
-            newComp.precondition = x.precondition
 
         mapping[(x._model.uuid, x.uuid)] = (newComp, False)
 

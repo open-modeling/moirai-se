@@ -13,24 +13,24 @@ LOGGER = getLogger(__name__)
 
 @process.register
 def _(
-    x: mm.fa.ComponentFunctionalAllocation,
+    x: mm.information.PortRealization,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ) -> bool:
-    """Find and merge Function Allocations
+    """Find and merge Port Realizations
 
     Parameters
     ==========
     x:
-        Function Allocation to process
+        Port Realization to process
     dest:
-        Destination model to add Function Allocations to
+        Destination model to add Port Realizations to
     src:
-        Source model to take Function Allocations from
+        Source model to take Port Realizations from
     base:
-        Base model to check Function Allocations against
+        Base model to check Port Realizations against
     mapping:
         Full mapping of the elements to the corresponding models
 
@@ -48,31 +48,41 @@ def _(
     
     destParentEntry = mapping.get((modelParent._model.uuid, modelParent.uuid)) # pyright: ignore[reportAttributeAccessIssue] expect ModelElement here with valid uuid
     if destParentEntry is None:
-        LOGGER.fatal(f"[{process.__qualname__}] Element parent was not found in cache, uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
-            x.uuid,
-            x.__class__,
-            modelParent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-            modelParent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-            modelParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
+        if isinstance(x, mm.capellacore.NamedElement):
+            LOGGER.fatal(f"[{process.__qualname__}] Element parent was not found in cache, name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
+                x.name,
+                x.uuid,
+                x.__class__,
+                modelParent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
+                modelParent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
+                modelParent.__class__,
+                x._model.name,
+                x._model.uuid,
+            )
+        else:
+            LOGGER.fatal(f"[{process.__qualname__}] Element parent was not found in cache, uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
+                x.uuid,
+                x.__class__,
+                modelParent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
+                modelParent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
+                modelParent.__class__,
+                x._model.name,
+                x._model.uuid,
+            )
         exit(str(ExitCodes.MergeFault))
 
     (destParent, fromLibrary) = destParentEntry
 
     targetCollection = None
 
-    if (isinstance(destParent, mm.oa.Entity)
-        or isinstance(destParent, mm.cs.Component)
-        or isinstance(destParent, mm.pa.PhysicalComponent)
-        or isinstance(destParent, mm.sa.SystemComponent)
-        or isinstance(destParent, mm.la.LogicalComponent)
+    if (isinstance(destParent, mm.fa.FunctionOutputPort)
+        or isinstance(destParent, mm.fa.FunctionInputPort)
+        or isinstance(destParent, mm.fa.ComponentPort)
     ):
-        targetCollection = destParent.functional_allocations # pyright: ignore[reportAttributeAccessIssue] expect allocated_functions exists
+        targetCollection = destParent.port_realizations
     else:
         LOGGER.fatal(
-            f"[{process.__qualname__}] Function Allocation parent is not a valid parent, Function uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+            f"[{process.__qualname__}] Port Realization parent is not a valid parent, Port uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
             x.uuid,
             x.__class__,
             destParent.name,
@@ -89,14 +99,14 @@ def _(
         # if source or target is not mapped, postpone allocation processing
         return False
     
-    matchingFunction = list(filter(lambda y: y.source == mappedSource[0] and x.target == mappedTarget[0], targetCollection)) # pyright: ignore[reportOptionalSubscript] check for none is above, mappedSource and mappedTarget are safe
+    matchingPort = list(filter(lambda y: y.source == mappedSource[0] and x.target == mappedTarget[0], targetCollection)) # pyright: ignore[reportOptionalSubscript] check for none is above, mappedSource and mappedTarget are safe
 
-    if (len(matchingFunction) > 0):
+    if (len(matchingPort) > 0):
         # assume it's same to take first, but theme might be more
-        mapping[(x._model.uuid, x.uuid)] = (matchingFunction[0], False)
+        mapping[(x._model.uuid, x.uuid)] = (matchingPort[0], False)
     else:
         LOGGER.debug(
-            f"[{process.__qualname__}] Create new Function Allocation uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+            f"[{process.__qualname__}] Create new Port Realization uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
             x.uuid,
             x.parent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
             x.parent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
@@ -111,6 +121,7 @@ def _(
         newComp = targetCollection.create(xtype=helpers.qtype_of(x._element),
             source = mappedSource[0],
             target = mappedTarget[0],
+
             description = x.description,
             is_visible_in_doc = x.is_visible_in_doc,
             is_visible_in_lm = x.is_visible_in_lm,
@@ -118,12 +129,6 @@ def _(
             sid = x.sid,
             summary = x.summary,
         ) 
-
-        # # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        # # Unknown fault creates broken Physical Architecture allocation
-        # # TODO: fix and eliminate
-        # if newComp.layer.name == "Physical Architecture":
-        #     return True
 
         # TODO: fix PVMT
         # .applied_property_value_groups = []
@@ -136,5 +141,6 @@ def _(
             newComp.status = x.status
 
         mapping[(x._model.uuid, x.uuid)] = (newComp, False)
+
 
     return True

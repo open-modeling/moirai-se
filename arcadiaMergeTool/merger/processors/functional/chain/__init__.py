@@ -1,4 +1,5 @@
 import capellambse.metamodel as mm
+import capellambse.model as m
 from capellambse import helpers
 from capellambse.model import ModelElement
 
@@ -7,38 +8,35 @@ from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
 
-from .._processor import process
-
-from . import realization # allocation, port, 
+from arcadiaMergeTool.merger.processors._processor import process
+from . import involvement
 
 __all__ = [
-    # "allocation",
-    # "port",
-    "realization"
+    "involvement"
 ]
 
 LOGGER = getLogger(__name__)
 
 @process.register
 def _(
-    x: mm.sa.Capability | mm.oa.OperationalCapability,
+    x: mm.fa.FunctionalChain,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ) -> bool:
-    """Find and merge Capabilities
+    """Find and merge Functional Chains
 
     Parameters
     ==========
     x:
-        Capability to process
+        Functional Chain to process
     dest:
-        Destination model to add Capabilities to
+        Destination model to add Functional Chains to
     src:
-        Source model to take Capabilities from
+        Source model to take Functional Chains from
     base:
-        Base model to check Capabilities against
+        Base model to check Functional Chains against
     mapping:
         Full mapping of the elements to the corresponding models
 
@@ -72,21 +70,19 @@ def _(
 
     targetCollection = None
 
-    if (isinstance(destParent, mm.sa.CapabilityPkg) 
-        or isinstance(destParent, mm.oa.OperationalCapabilityPkg)
-    ) and x.parent.capabilities[0] == x: # pyright: ignore[reportAttributeAccessIssue] expect capabilities are there
-        # HACK: assume Root Capavbility is a very first root component
-        # map system to system and assume it's done
-        mapping[(x._model.uuid, x.uuid)] = (destParent.capabilities[0], False)
-        return True
-    elif (isinstance(destParent, mm.oa.OperationalCapabilityPkg)
-        or isinstance(destParent, mm.sa.CapabilityPkg)
+    if (
+        isinstance(destParent, mm.fa.AbstractFunction)
+        or isinstance(destParent, mm.pa.PhysicalFunction)
+        or isinstance(destParent, mm.sa.SystemFunction)
+        or isinstance(destParent, mm.la.LogicalFunction)
+        or isinstance(destParent, mm.fa.FunctionalChain)
+        or isinstance(destParent, mm.la.CapabilityRealization)
+        or isinstance(destParent, mm.sa.Capability)
     ):
-        targetCollection = destParent.capabilities
-    # elif isinstance(destParent, mm.oa.)
+        targetCollection = destParent.functional_chains
     else:
         LOGGER.fatal(
-            f"[{process.__qualname__}] Capability parent is not a valid parent, Capability name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+            f"[{process.__qualname__}] Functional Chain parent is not a valid parent, Functional Chain name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
             x.name,
             x.uuid,
             x.__class__,
@@ -100,14 +96,14 @@ def _(
 
     # use weak match by name
     # TODO: implement strong match by PVMT properties
-    matchingCapability = list(filter(lambda y: y.name == x.name, targetCollection))
+    matchingFunctionalChain = list(filter(lambda y: y.name == x.name, targetCollection))
 
-    if (len(matchingCapability) > 0):
+    if (len(matchingFunctionalChain) > 0):
         # assume it's same to take first, but theme might be more
-        mapping[(x._model.uuid, x.uuid)] = (matchingCapability[0], False)
+        mapping[(x._model.uuid, x.uuid)] = (matchingFunctionalChain[0], False)
     else:
         LOGGER.debug(
-            f"[{process.__qualname__}] Create new Capability name [%s], uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+            f"[{process.__qualname__}] Create new Functional Chain name [%s], uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
             x.name,
             x.uuid,
             x.parent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
@@ -124,6 +120,7 @@ def _(
             description = x.description,
             is_visible_in_doc = x.is_visible_in_doc,
             is_visible_in_lm = x.is_visible_in_lm,
+            kind = x.kind,
             name = x.name,
             review = x.review,
             sid = x.sid,
@@ -131,19 +128,18 @@ def _(
         ) 
 
         # TODO: fix PVMT
-        # .applied_property_value_groups = 
+        # .applied_property_value_groups = []
         # .applied_property_values = []
-        # .property_value_groups = [0]
-        # .property_value_pkgs = []
+        # .property_value_groups = []
         # .property_values = []
         # .pvmt = 
 
-        if x.status is not None:
-            newComp.status = x.status
         if x.postcondition is not None:
             newComp.postcondition = x.postcondition
         if x.precondition is not None:
             newComp.precondition = x.precondition
+        if x.status is not None:
+            newComp.status = x.status
 
         mapping[(x._model.uuid, x.uuid)] = (newComp, False)
 

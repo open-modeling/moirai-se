@@ -1,44 +1,34 @@
-import capellambse.metamodel as mm
+from arcadiaMergeTool.helpers import ExitCodes
+from arcadiaMergeTool.merger.processors._processor import process
+from capellambse.metamodel import cs
 from capellambse import helpers
 from capellambse.model import ModelElement
-
-from arcadiaMergeTool.helpers import ExitCodes
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
-
-from .._processor import process
-
-from . import realization # allocation, port, 
-
-__all__ = [
-    # "allocation",
-    # "port",
-    "realization"
-]
 
 LOGGER = getLogger(__name__)
 
 @process.register
 def _(
-    x: mm.sa.Capability | mm.oa.OperationalCapability,
+    x: cs.PhysicalLink,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ) -> bool:
-    """Find and merge Capabilities
+    """Find and merge Components
 
     Parameters
     ==========
     x:
-        Capability to process
+        Component to process
     dest:
-        Destination model to add Capabilities to
+        Destination model to add components to
     src:
-        Source model to take Capabilities from
+        Source model to take components from
     base:
-        Base model to check Capabilities against
+        Base model to check components against
     mapping:
         Full mapping of the elements to the corresponding models
 
@@ -72,21 +62,11 @@ def _(
 
     targetCollection = None
 
-    if (isinstance(destParent, mm.sa.CapabilityPkg) 
-        or isinstance(destParent, mm.oa.OperationalCapabilityPkg)
-    ) and x.parent.capabilities[0] == x: # pyright: ignore[reportAttributeAccessIssue] expect capabilities are there
-        # HACK: assume Root Capavbility is a very first root component
-        # map system to system and assume it's done
-        mapping[(x._model.uuid, x.uuid)] = (destParent.capabilities[0], False)
-        return True
-    elif (isinstance(destParent, mm.oa.OperationalCapabilityPkg)
-        or isinstance(destParent, mm.sa.CapabilityPkg)
-    ):
-        targetCollection = destParent.capabilities
-    # elif isinstance(destParent, mm.oa.)
+    if isinstance(destParent, cs.Component):
+        targetCollection = destParent.physical_links # pyright: ignore[reportAttributeAccessIssue] except physical links exitst
     else:
         LOGGER.fatal(
-            f"[{process.__qualname__}] Capability parent is not a valid parent, Capability name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+            f"[{process.__qualname__}] Component parent is not a valid parent, Component name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
             x.name,
             x.uuid,
             x.__class__,
@@ -100,28 +80,39 @@ def _(
 
     # use weak match by name
     # TODO: implement strong match by PVMT properties
-    matchingCapability = list(filter(lambda y: y.name == x.name, targetCollection))
+    matchingComponent = list(filter(lambda y: y.name == x.name, targetCollection))
 
-    if (len(matchingCapability) > 0):
-        # assume it's same to take first, but theme might be more
-        mapping[(x._model.uuid, x.uuid)] = (matchingCapability[0], False)
-    else:
-        LOGGER.debug(
-            f"[{process.__qualname__}] Create new Capability name [%s], uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+    if (len(matchingComponent) > 0):
+        # coming here means that component was added in a project, not taken from the library
+        LOGGER.error(
+            f"[{process.__qualname__}] Non-library component detected. Component name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
             x.name,
             x.uuid,
-            x.parent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-            x.parent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-            x.parent.__class__,
             destParent.name,
             destParent.uuid,
-            destParent.__class__,
             x._model.name,
             x._model.uuid,
         )
 
+        # assume it's same to take first, but theme might be more
+        mapping[(x._model.uuid, x.uuid)] = (matchingComponent[0], False)
+    else:
+        LOGGER.debug(
+            f"[{process.__qualname__}] Create a non-library component name [%s], uuid [%s], model name [%s], uuid [%s]",
+            x.name,
+            x.uuid,
+            x._model.name,
+            x._model.uuid,
+        )
+
+        print(x)
+        exit()
+
         newComp = targetCollection.create(xtype=helpers.qtype_of(x._element),
             description = x.description,
+            is_abstract = x.is_abstract,
+            is_actor = x.is_actor,
+            is_human = x.is_human,
             is_visible_in_doc = x.is_visible_in_doc,
             is_visible_in_lm = x.is_visible_in_lm,
             name = x.name,
@@ -130,20 +121,22 @@ def _(
             summary = x.summary,
         ) 
 
+        .source = <PhysicalPort 'PP 2' (d1d4466a-54cf-46bd-bac9-7af09d1df728)>
+        .target = <PhysicalPort 'PP 4' (9f81ba5d-3041-44f4-8f1d-554273b433df)>
+
         # TODO: fix PVMT
-        # .applied_property_value_groups = 
+        # .applied_property_value_groups = []
         # .applied_property_values = []
-        # .property_value_groups = [0]
-        # .property_value_pkgs = []
+        # .property_value_groups = []
         # .property_values = []
         # .pvmt = 
 
-        if x.status is not None:
-            newComp.status = x.status
-        if x.postcondition is not None:
-            newComp.postcondition = x.postcondition
-        if x.precondition is not None:
-            newComp.precondition = x.precondition
+        # TODO: find a way to copy these properties
+        # if not isinstance(newComp, mm.epbs.ConfigurationItem):
+        #     newComp.super = x.super
+
+        if x.status is not None: # pyright: ignore[reportAttributeAccessIssue] expect status is valid attribute
+            newComp.status = x.status # pyright: ignore[reportAttributeAccessIssue] expect status is valid attribute
 
         mapping[(x._model.uuid, x.uuid)] = (newComp, False)
 
