@@ -4,6 +4,7 @@ from pathlib import PurePosixPath
 from arcadiaMergeTool import getLogger
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from capellambse.metamodel.libraries import LibraryReference
+from capellambse.model import ModelElement
 
 LOGGER = getLogger(name=__name__)
 
@@ -33,15 +34,37 @@ def mergeLibraries(
         f"[{mergeLibraries.__qualname__}] begin merging libraries into target model"
     )
 
-    # assume it's safe to merge libraries into the first ModelInfo extension
-    dst_ext: capellambse.model.ModelElement = dest.model.project.extensions[0]
+    def linkLibrary (lib, model, cache):
+        # assume it's safe to merge libraries into the first ModelInfo extension
+        dst_ext: capellambse.model.ModelElement = model.project.extensions[0]
+
+        lib_id: str = lib.extensions[0].uuid 
+        if lib and not cache.get(lib_id):
+            name = lib.name
+            LOGGER.debug(
+                f"[{linkLibrary.__qualname__}] adding new library [%s]",
+                name,
+            )
+
+            #in case of library is not loaded, link it
+            model._loader.link_library(
+                PurePosixPath(name)
+            )
+
+            if not cache.get(lib_id):
+                dst_ext.references.create(
+                    "LibraryReference", library=dest.model.by_uuid(lib_id)
+                )
+                cache[lib_id] = True
+
+
 
     for ext in dest.model.project.extensions:
         for ref in ext.references:
             if isinstance(ref, LibraryReference):
                 try:
-                    lib = ref.library
-                    if lib:
+                    lib: ModelElement = ref.library.parent # pyright: ignore[reportAssignmentType, reportOptionalMemberAccess] expect parent exists and it's ModelElement
+                    if lib is not None:
                         cache[lib.uuid] = True
                     else:
                         ext.references.remove(ref)
@@ -53,31 +76,13 @@ def mergeLibraries(
                     )
                     ext.references.remove(ref)
 
-    libs: list[CapellaMergeModel] = []
-    libs.extend(src)
-    libs.append(base)
+    linkLibrary(base.model.project, dest.model, cache)
 
-    for model in libs:
+    for model in src:
         proj = model.model.project
         for ext in proj.extensions:
             for ref in ext.references:
                 if isinstance(ref, LibraryReference):
-                    lib = ref.library
-                    if lib and not cache.get(lib.uuid):
-                        name = lib.parent.name  # pyright: ignore[reportAttributeAccessIssue] name is a valid attribute here
-                        LOGGER.debug(
-                            f"[{mergeLibraries.__qualname__}] adding new library [%s]",
-                            name,
-                        )
-
-                        """in case of library is not loaded, link it"""
-                        dest.model._loader._link_library(
-                            PurePosixPath("product-configuration")
-                        )
-
-                        if not cache.get(lib.uuid):
-                            new_lib = dest.model.by_uuid(lib.uuid)
-                            dst_ext.references.create(
-                                "LibraryReference", library=new_lib
-                            )
-                            cache[lib.uuid] = True
+                    ext = ref.library
+                    if ext is not None:
+                        linkLibrary(ext.parent, dest.model, cache)
