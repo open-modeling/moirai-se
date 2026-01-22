@@ -6,7 +6,7 @@ from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
 
-from .._processor import process
+from arcadiaMergeTool.merger.processors._processor import process, doProcess
 
 from . import allocation, involvement
 
@@ -30,7 +30,7 @@ def _(
     Parameters
     ==========
     x:
-        Capability to process
+        Mission to process
     dest:
         Destination model to add Missions to
     src:
@@ -47,11 +47,11 @@ def _(
     if mapping.get((x._model.uuid, x.uuid)) is not None:
         return True
 
-    # recursively check all direct parents for existence and continue only if parents agree
-    modelParent = x.parent  # pyright: ignore[reportAttributeAccessIssue] expect parent is there in valid model
-    if not process(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect model parent is a valid argument
+    modelParent = x.parent
+    if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of tyoe ModelElement
+        # safeguard for direct call
         return False
-    
+
     destParentEntry = mapping.get((modelParent._model.uuid, modelParent.uuid)) # pyright: ignore[reportAttributeAccessIssue] expect ModelElement here with valid uuid
     if destParentEntry is None:
         LOGGER.fatal(f"[{process.__qualname__}] Element parent was not found in cache, name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
@@ -76,7 +76,7 @@ def _(
         targetCollection = destParent.missions
     else:
         LOGGER.fatal(
-            f"[{process.__qualname__}] Capability parent is not a valid parent, Capability name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+            f"[{process.__qualname__}] Mission parent is not a valid parent, Mission name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
             x.name,
             x.uuid,
             x.__class__,
@@ -90,14 +90,14 @@ def _(
 
     # use weak match by name
     # TODO: implement strong match by PVMT properties
-    matchingCapability = list(filter(lambda y: y.name == x.name, targetCollection))
+    matchingMission = list(filter(lambda y: y.name == x.name, targetCollection))
 
-    if (len(matchingCapability) > 0):
+    if (len(matchingMission) > 0):
         # assume it's same to take first, but theme might be more
-        mapping[(x._model.uuid, x.uuid)] = (matchingCapability[0], False)
+        mapping[(x._model.uuid, x.uuid)] = (matchingMission[0], False)
     else:
         LOGGER.debug(
-            f"[{process.__qualname__}] Create new Capability name [%s], uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+            f"[{process.__qualname__}] Create new Mission name [%s], uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
             x.name,
             x.uuid,
             x.parent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there

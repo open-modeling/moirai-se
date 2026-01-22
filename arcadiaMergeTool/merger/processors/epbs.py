@@ -1,6 +1,5 @@
-from arcadiaMergeTool.merger.processors._processor import process
+from arcadiaMergeTool.merger.processors._processor import process, doProcess
 from capellambse.metamodel import epbs
-from capellambse.model import ModelElement
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
@@ -32,3 +31,4 @@ def _(
 
     return True
 
+epbs.PhysicalArtifactRealization

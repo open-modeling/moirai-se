@@ -6,7 +6,7 @@ from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
 
-from .._processor import process
+from arcadiaMergeTool.merger.processors._processor import process, doProcess
 
 from . import allocation, port, realization
 
@@ -20,7 +20,7 @@ LOGGER = getLogger(__name__)
 
 @process.register
 def _(
-    x: mm.fa.AbstractFunction,
+    x: mm.fa.AbstractFunction | mm.sa.SystemFunction | mm.la.LogicalFunction | mm.pa.PhysicalFunction | mm.oa.OperationalActivity,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
@@ -48,11 +48,11 @@ def _(
     if mapping.get((x._model.uuid, x.uuid)) is not None:
         return True
 
-    # recursively check all direct parents for existence and continue only if parents agree
-    modelParent = x.parent  # pyright: ignore[reportAttributeAccessIssue] expect parent is there in valid model
-    if not process(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect model parent is a valid argument
+    modelParent = x.parent
+    if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of tyoe ModelElement
+        # safeguard for direct call
         return False
-    
+
     destParentEntry = mapping.get((modelParent._model.uuid, modelParent.uuid)) # pyright: ignore[reportAttributeAccessIssue] expect ModelElement here with valid uuid
     if destParentEntry is None:
         LOGGER.fatal(f"[{process.__qualname__}] Element parent was not found in cache, name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
@@ -71,18 +71,11 @@ def _(
 
     targetCollection = None
 
-    if (isinstance(destParent, mm.sa.SystemFunctionPkg) 
-        or isinstance(destParent, mm.la.LogicalFunctionPkg)
-        or isinstance(destParent, mm.pa.PhysicalFunctionPkg)
-        ) and x.parent.functions[0] == x: # pyright: ignore[reportAttributeAccessIssue] expect functions are there
-        # HACK: assume Root Function is a very first root component
-        # map system to system and assume it's done
-        mapping[(x._model.uuid, x.uuid)] = (destParent.functions[0], False)
-        return True
-    elif isinstance(destParent, mm.oa.OperationalActivityPkg) and x.parent.activities[0] == x: # pyright: ignore[reportAttributeAccessIssue] expect activities are there
-        # HACK: assume Root Activity is a very first root component
-        # map system to system and assume it's done
-        mapping[(x._model.uuid, x.uuid)] = (destParent.activities[0], False)
+    if (isinstance(destParent, mm.sa.SystemAnalysis) 
+        or isinstance(destParent, mm.la.LogicalArchitecture)
+        or isinstance(destParent, mm.pa.PhysicalArchitecture)
+        ) and destParent.root_function == x:
+        mapping[(x._model.uuid, x.uuid)] = (destParent.root_function, False)
         return True
     elif isinstance(destParent, mm.oa.OperationalActivityPkg):
         targetCollection = destParent.activities
@@ -170,7 +163,6 @@ def _(
         # newComp.min_length = x.min_length
         # newComp.min_value = x.min_value
         # newComp.null_value = x.null_value
-        # newComp.type = x.type
 
         if x.status is not None:
             newComp.status = x.status
@@ -178,3 +170,4 @@ def _(
         mapping[(x._model.uuid, x.uuid)] = (newComp, False)
 
     return True
+

@@ -1,7 +1,7 @@
 import capellambse.metamodel as mm
 from capellambse import helpers
 from arcadiaMergeTool.helpers import ExitCodes
-from arcadiaMergeTool.merger.processors._processor import process
+from arcadiaMergeTool.merger.processors._processor import process, doProcess
 from capellambse.metamodel import capellamodeller as ca
 from capellambse.model import ModelElement
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
@@ -30,6 +30,32 @@ def _(
     if mapping.get((x._model.uuid, x.uuid)) is None:
         package = None
         if isinstance(x, ca.SystemEngineering):
+            package = dest.model.project.model_root
+        
+        mapping[(x._model.uuid, x.uuid)] = (package, False) # pyright: ignore[reportArgumentType] expect root is exists and correct element
+
+    return True
+
+@process.register
+def _(
+    x: ca.Project,
+    dest: CapellaMergeModel,
+    src: CapellaMergeModel,
+    base: CapellaMergeModel,
+    mapping: MergerElementMappingMap,
+) -> bool:
+    LOGGER.debug(
+        f"[{process.__qualname__}] create root entry for package [%s], class [%s], uuid [%s], model name [%s], uuid [%s]",
+        x.name,
+        x.__class__,
+        x.uuid,
+        x._model.name,
+        x._model.uuid,
+    )
+
+    if mapping.get((x._model.uuid, x.uuid)) is None:
+        package = None
+        if isinstance(x, ca.Project):
             package = dest.model.project
         
         mapping[(x._model.uuid, x.uuid)] = (package, False)
@@ -66,9 +92,9 @@ def _(
     if mapping.get((x._model.uuid, x.uuid)) is not None:
         return True
 
-    # recursively check all direct parents for existence and continue only if parents agree
-    modelParent = x.parent  # pyright: ignore[reportAttributeAccessIssue] expect parent is there in valid model
-    if not process(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect model parent is a valid argument
+    modelParent = x.parent
+    if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of tyoe ModelElement
+        # safeguard for direct call
         return False
     
     destParentEntry = mapping.get((modelParent._model.uuid, modelParent.uuid)) # pyright: ignore[reportAttributeAccessIssue] expect ModelElement here with valid uuid

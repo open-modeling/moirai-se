@@ -8,12 +8,13 @@ from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingEntry, MergerElementMappingMap
 from arcadiaMergeTool import getLogger
 
-from arcadiaMergeTool.merger.processors._processor import process
+from arcadiaMergeTool.merger.processors._processor import process, doProcess
 
-from . import allocation
+from . import allocation, realization
 
 __all__ = [
     "allocation",
+    "realization"
 ]
 
 LOGGER = getLogger(__name__)
@@ -98,11 +99,11 @@ def _(
     if mapping.get((x._model.uuid, x.uuid)) is not None:
         return True
 
-    # recursively check all direct parents for existence and continue only if parents agree
-    modelParent = x.parent  # pyright: ignore[reportAttributeAccessIssue] expect parent is there in valid model
-    if not process(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect model parent is a valid argument
+    modelParent = x.parent
+    if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of tyoe ModelElement
+        # safeguard for direct call
         return False
-    
+
     destParentEntry = mapping.get((modelParent._model.uuid, modelParent.uuid)) # pyright: ignore[reportAttributeAccessIssue] expect ModelElement here with valid uuid
     if destParentEntry is None:
         LOGGER.fatal(f"[{process.__qualname__}] Element parent was not found in cache, name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
@@ -153,8 +154,8 @@ def _(
     # 
     # In both cases - iterate through the exchanges and match them by name
 
-    process(x.source, dest, src, base, mapping)
-    process(x.target, dest, src, base, mapping)
+    doProcess(x.source, dest, src, base, mapping)
+    doProcess(x.target, dest, src, base, mapping)
 
     sourceComponentMap = mapping.get((x.source.parent._model.uuid, x.source.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect source exists in this context
     targetComponentMap = mapping.get((x.target.parent._model.uuid, x.target.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect target exists in this context
@@ -210,15 +211,12 @@ def _(
             review = x.review,
             sid = x.sid,
             summary = x.summary,
-    ) 
+        ) 
 
         # TODO: fix PVMT
         # .property_value_groups = []
         # .property_values = []
         # .pvmt = 
-
-        # TODO: find a way to copy these properties
-        # newComp.progress_status = x.progress_status
 
         if x.status is not None:
             newComp.status = x.status

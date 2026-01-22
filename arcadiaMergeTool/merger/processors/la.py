@@ -1,4 +1,4 @@
-from arcadiaMergeTool.merger.processors._processor import process
+from arcadiaMergeTool.merger.processors._processor import process, doProcess
 from capellambse.metamodel import la
 from capellambse.model import ModelElement
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
