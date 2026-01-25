@@ -1,9 +1,9 @@
 from capellambse import helpers
 
 from arcadiaMergeTool.helpers import ExitCodes
-from arcadiaMergeTool.merger.processors._processor import doProcess, process
+from arcadiaMergeTool.merger.processors._processor import clone, doProcess, process, recordMatch
 from capellambse.metamodel import pa
-from capellambse.model import ModelElement
+import capellambse.model as m
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
@@ -56,9 +56,35 @@ def _(
 
     return True
 
+T = pa.PhysicalFunctionPkg
+
+@clone.register
+def _ (srcEl: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
+    newComp = coll.create(helpers.xtype_of(srcEl._element),
+        description = srcEl.description,
+        is_visible_in_doc = srcEl.is_visible_in_doc,
+        is_visible_in_lm = srcEl.is_visible_in_lm,
+        name = srcEl.name,
+        review = srcEl.review,
+        sid = srcEl.sid,
+        summary = srcEl.summary,
+    ) 
+
+    # TODO: fix PVMT
+    # .applied_property_value_groups = []
+    # .applied_property_values = []
+    # .property_value_groups = []
+    # .property_values = []
+    # .pvmt = 
+
+    if srcEl.status is not None:
+        newComp.status = srcEl.status
+
+    return newComp
+
 @process.register
 def _(
-    x: pa.PhysicalFunctionPkg,
+    x: T,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
@@ -114,7 +140,7 @@ def _(
         # HACK: use hardcoded property define a root function package
         mapping[(x._model.uuid, x.uuid)] = (destParent.function_pkg, False) # pyright: ignore[reportArgumentType] assume root function_pkg is always there
         return True
-    elif (isinstance(destParent, pa.PhysicalFunctionPkg)
+    elif (isinstance(destParent, T)
             or isinstance(destParent, pa.PhysicalFunction)
     ):
         targetCollection = destParent.packages
@@ -134,46 +160,6 @@ def _(
 
     # use weak match by name
     # TODO: implement strong match by PVMT properties
-    matchingFunctionPkg = list(filter(lambda y: y.name == x.name, targetCollection))
+    matchList = list(filter(lambda y: y.name == x.name, targetCollection))
 
-    if (len(matchingFunctionPkg) > 0):
-        # assume it's same to take first, but theme might be more
-        mapping[(x._model.uuid, x.uuid)] = (matchingFunctionPkg[0], False)
-    else:
-        LOGGER.debug(
-            f"[{process.__qualname__}] Create new function name [%s], uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
-            x.name,
-            x.uuid,
-            x.parent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-            x.parent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-            x.parent.__class__,
-            destParent.name,
-            destParent.uuid,
-            destParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
-
-        newComp = targetCollection.create(xtype=helpers.qtype_of(x._element),
-            description = x.description,
-            is_visible_in_doc = x.is_visible_in_doc,
-            is_visible_in_lm = x.is_visible_in_lm,
-            name = x.name,
-            review = x.review,
-            sid = x.sid,
-            summary = x.summary,
-        ) 
-
-        # TODO: fix PVMT
-        # .applied_property_value_groups = []
-        # .applied_property_values = []
-        # .property_value_groups = []
-        # .property_values = []
-        # .pvmt = 
-
-        if x.status is not None:
-            newComp.status = x.status
-
-        mapping[(x._model.uuid, x.uuid)] = (newComp, False)
-
-    return True
+    return recordMatch(matchList, x, destParent, targetCollection, mapping)

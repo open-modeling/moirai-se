@@ -1,14 +1,14 @@
 import capellambse.metamodel as mm
 import capellambse.model as m
 from capellambse import helpers
-from capellambse.model import ModelElement
 
 from arcadiaMergeTool.helpers import ExitCodes
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
 
-from arcadiaMergeTool.merger.processors._processor import process, doProcess
+from arcadiaMergeTool.merger.processors._processor import clone, process, doProcess, recordMatch
+
 from . import involvement
 
 __all__ = [
@@ -17,9 +17,40 @@ __all__ = [
 
 LOGGER = getLogger(__name__)
 
+T = mm.fa.FunctionalChain
+
+@clone.register
+def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
+    newComp = coll.create(helpers.xtype_of(x._element),
+        description = x.description,
+        is_visible_in_doc = x.is_visible_in_doc,
+        is_visible_in_lm = x.is_visible_in_lm,
+        kind = x.kind,
+        name = x.name,
+        review = x.review,
+        sid = x.sid,
+        summary = x.summary,
+    ) 
+
+    # TODO: fix PVMT
+    # .applied_property_value_groups = []
+    # .applied_property_values = []
+    # .property_value_groups = []
+    # .property_values = []
+    # .pvmt = 
+
+    if x.postcondition is not None:
+        newComp.postcondition = x.postcondition
+    if x.precondition is not None:
+        newComp.precondition = x.precondition
+    if x.status is not None:
+        newComp.status = x.status
+
+    return newComp
+
 @process.register
 def _(
-    x: mm.fa.FunctionalChain,
+    x: T,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
@@ -96,51 +127,6 @@ def _(
 
     # use weak match by name
     # TODO: implement strong match by PVMT properties
-    matchingFunctionalChain = list(filter(lambda y: y.name == x.name, targetCollection))
+    matchList = list(filter(lambda y: y.name == x.name, targetCollection))
 
-    if (len(matchingFunctionalChain) > 0):
-        # assume it's same to take first, but theme might be more
-        mapping[(x._model.uuid, x.uuid)] = (matchingFunctionalChain[0], False)
-    else:
-        LOGGER.debug(
-            f"[{process.__qualname__}] Create new Functional Chain name [%s], uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
-            x.name,
-            x.uuid,
-            x.parent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-            x.parent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-            x.parent.__class__,
-            destParent.name,
-            destParent.uuid,
-            destParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
-
-        newComp = targetCollection.create(xtype=helpers.qtype_of(x._element),
-            description = x.description,
-            is_visible_in_doc = x.is_visible_in_doc,
-            is_visible_in_lm = x.is_visible_in_lm,
-            kind = x.kind,
-            name = x.name,
-            review = x.review,
-            sid = x.sid,
-            summary = x.summary,
-        ) 
-
-        # TODO: fix PVMT
-        # .applied_property_value_groups = []
-        # .applied_property_values = []
-        # .property_value_groups = []
-        # .property_values = []
-        # .pvmt = 
-
-        if x.postcondition is not None:
-            newComp.postcondition = x.postcondition
-        if x.precondition is not None:
-            newComp.precondition = x.precondition
-        if x.status is not None:
-            newComp.status = x.status
-
-        mapping[(x._model.uuid, x.uuid)] = (newComp, False)
-
-    return True
+    return recordMatch(matchList, x, destParent, targetCollection, mapping)

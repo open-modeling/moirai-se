@@ -6,7 +6,8 @@ from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
 
-from arcadiaMergeTool.merger.processors._processor import process, doProcess
+import capellambse.model as m
+from arcadiaMergeTool.merger.processors._processor import clone, process, doProcess, recordMatch
 
 from . import exchange, port, physical, realization
 
@@ -19,9 +20,44 @@ __all__ = [
 
 LOGGER = getLogger(__name__)
 
+T = mm.cs.Component
+
+@clone.register
+def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap): # pyright: ignore[reportInvalidTypeArguments]
+    newComp = coll.create(helpers.xtype_of(x._element),
+        description = x.description,
+        is_abstract = x.is_abstract,
+        is_actor = x.is_actor,
+        is_human = x.is_human,
+        is_visible_in_doc = x.is_visible_in_doc,
+        is_visible_in_lm = x.is_visible_in_lm,
+        name = x.name,
+        review = x.review,
+        sid = x.sid,
+        summary = x.summary,
+    ) 
+
+    # TODO: fix PVMT
+    # .property_value_groups = []
+    # .property_values = []
+    # .pvmt = 
+
+    # TODO: find a way to copy these properties
+    # if not isinstance(newComp, mm.epbs.ConfigurationItem):
+    #     newComp.super = x.super
+
+    if x.status is not None: # pyright: ignore[reportAttributeAccessIssue] expect status is valid attribute
+        newComp.status = x.status # pyright: ignore[reportAttributeAccessIssue] expect status is valid attribute
+        
+    if not isinstance(newComp, mm.la.LogicalComponent):
+        newComp.kind = x.kind
+        newComp.nature = x.nature
+
+    return newComp
+
 @process.register
 def _(
-    x: mm.cs.Component,
+    x: T,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
@@ -49,7 +85,7 @@ def _(
     if mapping.get((x._model.uuid, x.uuid)) is not None:
         return True
 
-    modelParent = x.parent
+    modelParent = x.parent # pyright: ignore[reportAttributeAccessIssue] expect parent is there
     if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of tyoe ModelElement
         # safeguard for direct call
         return False
@@ -112,60 +148,6 @@ def _(
 
     # use weak match by name
     # TODO: implement strong match by PVMT properties
-    matchingComponent = list(filter(lambda y: y.name == x.name, targetCollection))
+    matchList = list(filter(lambda y: y.name == x.name, targetCollection))
 
-    if (len(matchingComponent) > 0):
-        # coming here means that component was added in a project, not taken from the library
-        LOGGER.error(
-            f"[{process.__qualname__}] Non-library component detected. Component name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
-            x.name,
-            x.uuid,
-            destParent.name,
-            destParent.uuid,
-            x._model.name,
-            x._model.uuid,
-        )
-
-        # assume it's same to take first, but theme might be more
-        mapping[(x._model.uuid, x.uuid)] = (matchingComponent[0], False)
-    else:
-        LOGGER.debug(
-            f"[{process.__qualname__}] Create a non-library component name [%s], uuid [%s], model name [%s], uuid [%s]",
-            x.name,
-            x.uuid,
-            x._model.name,
-            x._model.uuid,
-        )
-        newComp = targetCollection.create(xtype=helpers.qtype_of(x._element),
-            description = x.description,
-            is_abstract = x.is_abstract,
-            is_actor = x.is_actor,
-            is_human = x.is_human,
-            is_visible_in_doc = x.is_visible_in_doc,
-            is_visible_in_lm = x.is_visible_in_lm,
-            name = x.name,
-            review = x.review,
-            sid = x.sid,
-            summary = x.summary,
-        ) 
-
-        # TODO: fix PVMT
-        # .property_value_groups = []
-        # .property_values = []
-        # .pvmt = 
-
-        # TODO: find a way to copy these properties
-        # if not isinstance(newComp, mm.epbs.ConfigurationItem):
-        #     newComp.super = x.super
-
-        if x.status is not None: # pyright: ignore[reportAttributeAccessIssue] expect status is valid attribute
-            newComp.status = x.status # pyright: ignore[reportAttributeAccessIssue] expect status is valid attribute
-            
-        if not isinstance(newComp, mm.la.LogicalComponent):
-            newComp.kind = x.kind
-            newComp.nature = x.nature
-
-        # TODO: add other properties, but do not touch linked elements - they are processed by top level iterator
-        mapping[(x._model.uuid, x.uuid)] = (newComp, False)
-
-    return True
+    return recordMatch(matchList, x, destParent, targetCollection, mapping)

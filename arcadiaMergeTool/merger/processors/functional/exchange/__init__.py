@@ -201,8 +201,8 @@ def _(
             x._model.uuid,
         )
 
-        # newComp = targetCollection.create(xtype=helpers.qtype_of(x._element), source=sourceFunctionPortMap, target=targetFunctionPortMap) 
-        newComp = targetCollection.create(xtype=helpers.qtype_of(x._element),
+        # newComp = targetCollection.create(helpers.xtype_of(x._element), source=sourceFunctionPortMap, target=targetFunctionPortMap) 
+        newComp = targetCollection.create(helpers.xtype_of(x._element),
             description = x.description,
             is_multicast = x.is_multicast,
             is_multireceive = x.is_multireceive,

@@ -7,13 +7,56 @@ from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
 
-from arcadiaMergeTool.merger.processors._processor import process, doProcess
+import capellambse.model as m
+from arcadiaMergeTool.merger.processors._processor import clone, process, doProcess, recordMatch
 
 LOGGER = getLogger(__name__)
 
+T =  dt.StringType
+
+@clone.register
+def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
+
+    # .default_value = None
+    # .null_value = None
+
+    newComp = coll.create(helpers.xtype_of(x._element),
+        description = x.description,
+        is_abstract = x.is_abstract,
+        is_discrete = x.is_discrete,
+        is_final = x.is_final,
+        is_max_inclusive = x.is_max_inclusive,
+        is_min_inclusive = x.is_min_inclusive,
+        is_visible_in_doc = x.is_visible_in_doc,
+        is_visible_in_lm = x.is_visible_in_lm,
+        # max_length = x.max_length,
+        # min_length = x.min_length,
+        name = x.name,
+        pattern = x.pattern,
+        review = x.review,
+        sid = x.sid,
+        summary = x.summary,
+        visibility = x.visibility,
+    ) 
+
+    # TODO: fix PVMT
+    # .applied_property_value_groups = 
+    # .applied_property_values = []
+    # .property_value_groups = [0]
+    # .property_value_pkgs = []
+    # .property_values = []
+    # .pvmt = 
+
+    if x.status is not None:
+        newComp.status = x.status
+    if x.super is not None:
+        newComp.super = x.super
+
+    return newComp
+
 @process.register
 def _(
-    x: dt.StringType,
+    x: T,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
@@ -83,61 +126,6 @@ def _(
 
     # use weak match by name
     # TODO: implement strong match by PVMT properties
-    matchingPropertyValuePackages = list(filter(lambda y: y.name == x.name, targetCollection))
+    matchList = list(filter(lambda y: y.name == x.name, targetCollection))
 
-    if (len(matchingPropertyValuePackages) > 0):
-        # assume it's same to take first, but theme might be more
-        mapping[(x._model.uuid, x.uuid)] = (matchingPropertyValuePackages[0], False)
-    else:
-        LOGGER.debug(
-            f"[{process.__qualname__}] Create new Literal Values name [%s], uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
-            x.name,
-            x.uuid,
-            x.parent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-            x.parent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-            x.parent.__class__,
-            destParent.name,
-            destParent.uuid,
-            destParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
-
-        # .default_value = None
-        # .null_value = None
-
-        newComp = targetCollection.create(xtype=helpers.qtype_of(x._element),
-            description = x.description,
-            is_abstract = x.is_abstract,
-            is_discrete = x.is_discrete,
-            is_final = x.is_final,
-            is_max_inclusive = x.is_max_inclusive,
-            is_min_inclusive = x.is_min_inclusive,
-            is_visible_in_doc = x.is_visible_in_doc,
-            is_visible_in_lm = x.is_visible_in_lm,
-            # max_length = x.max_length,
-            # min_length = x.min_length,
-            name = x.name,
-            pattern = x.pattern,
-            review = x.review,
-            sid = x.sid,
-            summary = x.summary,
-            visibility = x.visibility,
-        ) 
-
-        # TODO: fix PVMT
-        # .applied_property_value_groups = 
-        # .applied_property_values = []
-        # .property_value_groups = [0]
-        # .property_value_pkgs = []
-        # .property_values = []
-        # .pvmt = 
-
-        if x.status is not None:
-            newComp.status = x.status
-        if x.super is not None:
-            newComp.super = x.super
-
-        mapping[(x._model.uuid, x.uuid)] = (newComp, False)
-
-    return True
+    return recordMatch(matchList, x, destParent, targetCollection, mapping)

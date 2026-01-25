@@ -200,7 +200,7 @@ def _(
             x._model.uuid,
         )
 
-        newComp = targetCollection.create(xtype=helpers.qtype_of(x._element),
+        newComp = targetCollection.create(helpers.xtype_of(x._element),
             description = x.description,
             is_visible_in_doc = x.is_visible_in_doc,
             is_visible_in_lm = x.is_visible_in_lm,

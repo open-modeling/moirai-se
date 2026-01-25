@@ -51,7 +51,7 @@ def __createCompoentPort(x: mm.fa.FunctionPort, targetCollection: m._obj.Element
         x._model.name,
         x._model.uuid,
     )
-    newComp = targetCollection.create(xtype=helpers.qtype_of(x._element),
+    newComp = targetCollection.create(helpers.xtype_of(x._element),
         is_control = x.is_control,
         is_control_type = x.is_control_type,
         is_visible_in_doc = x.is_visible_in_doc,

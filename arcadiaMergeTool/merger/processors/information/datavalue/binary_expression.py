@@ -1,10 +1,5 @@
-import capellambse.model as m
-import capellambse.metamodel as mm
-import capellambse.metamodel.capellacore as cc
-import capellambse.metamodel.capellamodeller as cm
 import capellambse.metamodel.information.datavalue as dv
 import capellambse.metamodel.information.datatype as dt
-from capellambse import MelodyModel, helpers
 
 from arcadiaMergeTool.helpers import ExitCodes, create_element
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
@@ -103,4 +98,5 @@ def _(
         exit(str(ExitCodes.MergeFault))
 
     mapping[(x._model.uuid, x.uuid)] = (el, False)
+    
     return True

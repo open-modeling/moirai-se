@@ -7,7 +7,8 @@ from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
 
-from arcadiaMergeTool.merger.processors._processor import process, doProcess
+import capellambse.model as m
+from arcadiaMergeTool.merger.processors._processor import clone, process, doProcess, recordMatch
 
 from . import deployment
 
@@ -17,9 +18,58 @@ __all__ = [
 
 LOGGER = getLogger(__name__)
 
+T = mm.cs.Part
+
+@clone.register
+def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
+    newComp = coll.create(helpers.xtype_of(x._element),
+        type = mapping[(x._model.uuid, x.type.uuid)][0], # pyright: ignore[reportOptionalMemberAccess] expect type exists and uuid is valid
+        name = x.name,
+        description = x.description,
+        is_abstract = x.is_abstract,
+        is_derived = x.is_derived,
+        is_final = x.is_final,
+        is_max_inclusive = x.is_max_inclusive,
+        is_min_inclusive = x.is_min_inclusive,
+        is_ordered = x.is_ordered,
+        is_part_of_key = x.is_part_of_key,
+        is_read_only = x.is_read_only,
+        is_static = x.is_static,
+        is_unique = x.is_unique,
+        is_visible_in_doc = x.is_visible_in_doc,
+        is_visible_in_lm = x.is_visible_in_lm,
+        review = x.review,
+        sid = x.sid,
+        summary = x.summary,
+        visibility = x.visibility,
+    ) 
+
+    # TODO: track PVMT
+    # .applied_property_value_groups = []
+    # .applied_property_values = []
+    # .property_value_groups = []
+    # .property_values = []
+
+    # TODO: check how to copy these values
+    # newComp.default_value = x.default_value
+    # newComp.max_card = x.max_card
+    # newComp.max_length = x.max_length
+    # newComp.max_value = x.max_value
+    # newComp.min_card = x.min_card
+    # newComp.min_length = x.min_length
+    # newComp.min_value = x.min_value
+    # newComp.null_value = x.null_value
+    # newComp.owned_type = x.owned_type
+
+    if x.status is not None:
+        newComp.status = x.status  # pyright: ignore[reportAttributeAccessIssue] assume status is already there
+
+    return newComp
+
+
 @process.register
 def _(
-    x: mm.cs.Part,
+    x: T,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
@@ -48,9 +98,12 @@ def _(
         return True
 
     modelParent = x.parent
-    if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of tyoe ModelElement
-        # safeguard for direct call
-        return False
+    if (not doProcess(modelParent, dest, src, base, mapping) # pyright: ignore[reportArgumentType] expect modelParent is of tyoe ModelElement
+        or not doProcess(x.type, dest, src, base, mapping) # pyright: ignore[reportArgumentType] expect x.type is valid property
+    ):
+        # part is merely a link to a component, check if component can be referenced
+        # if not, stop processing to retry later
+        return False  # safeguard for direct call
 
     destParentEntry = mapping.get((modelParent._model.uuid, modelParent.uuid)) # pyright: ignore[reportAttributeAccessIssue] expect ModelElement here with valid uuid
     if destParentEntry is None:
@@ -77,10 +130,12 @@ def _(
         # HACK: assume System is a very first root part
         # map system to system and assume it's done
         mapping[(x._model.uuid, x.uuid)] = (destParent.parts[0], False)
+        return True
     elif isinstance(destParent, mm.epbs.ConfigurationItemPkg) and destParent.configuration_items[0] == x:
         # HACK: assume System is a very first root configuratiobn item
         # map system to system and assume it's done
         mapping[(x._model.uuid, x.uuid)] = (destParent.configuration_items[0], False)
+        return True
     elif (isinstance(destParent, mm.cs.Component)
         or isinstance(destParent, mm.pa.PhysicalComponentPkg)
         or isinstance(destParent, mm.sa.SystemComponentPkg)
@@ -103,87 +158,8 @@ def _(
         )
         exit(str(ExitCodes.MergeFault))
 
-    if targetCollection is not None:
-        # use weak match by name
-        # TODO: implement strong match by PVMT properties
-        matchingPart = list(filter(lambda y: y.name == x.name, targetCollection))
+    # use weak match by name
+    # TODO: implement strong match by PVMT properties
+    matchList = list(filter(lambda y: y.name == x.name, targetCollection))
 
-        if (len(matchingPart) > 0):
-            # coming here means that part was added in a project, not taken from the library
-
-            targetPart = matchingPart[0]
-            mappedTargetPart = mapping.get((targetPart._model.uuid, targetPart.uuid))
-            fromLibrary = mappedTargetPart[1] if mappedTargetPart is not None else False
-            if not fromLibrary:
-                LOGGER.error(
-                    f"[{process.__qualname__}] Non-library part detected. Part name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
-                    x.name,
-                    x.uuid,
-                    destParent.name,
-                    destParent.uuid,
-                    x._model.name,
-                    x._model.uuid,
-                )
-
-            # assume it's same to take first, but theme might be more
-            mapping[(x._model.uuid, x.uuid)] = (matchingPart[0], fromLibrary)
-        else:
-            LOGGER.debug(
-                f"[{process.__qualname__}] Create a non-library part name [%s], uuid [%s], model name [%s], uuid [%s]",
-                x.name,
-                x.uuid,
-                x._model.name,
-                x._model.uuid,
-            )
-
-            if not doProcess(x.type, dest, src, base, mapping):
-                # part is merely a link to a component, check if component can be references
-                # if not, stop processing to retry later
-                return False
-
-            newComp = targetCollection.create(xtype=helpers.qtype_of(x._element),
-                type = mapping[(x._model.uuid, x.type.uuid)][0], # pyright: ignore[reportOptionalMemberAccess] expect type exists and uuid is valid
-                name = x.name,
-                description = x.description,
-                is_abstract = x.is_abstract,
-                is_derived = x.is_derived,
-                is_final = x.is_final,
-                is_max_inclusive = x.is_max_inclusive,
-                is_min_inclusive = x.is_min_inclusive,
-                is_ordered = x.is_ordered,
-                is_part_of_key = x.is_part_of_key,
-                is_read_only = x.is_read_only,
-                is_static = x.is_static,
-                is_unique = x.is_unique,
-                is_visible_in_doc = x.is_visible_in_doc,
-                is_visible_in_lm = x.is_visible_in_lm,
-                review = x.review,
-                sid = x.sid,
-                summary = x.summary,
-                visibility = x.visibility,
-            ) 
-
-            # TODO: track PVMT
-            # .applied_property_value_groups = []
-            # .applied_property_values = []
-            # .property_value_groups = []
-            # .property_values = []
-
-            # TODO: check how to copy these values
-            # newComp.default_value = x.default_value
-            # newComp.max_card = x.max_card
-            # newComp.max_length = x.max_length
-            # newComp.max_value = x.max_value
-            # newComp.min_card = x.min_card
-            # newComp.min_length = x.min_length
-            # newComp.min_value = x.min_value
-            # newComp.null_value = x.null_value
-            # newComp.owned_type = x.owned_type
-
-            if x.status is not None:
-                newComp.status = x.status  # pyright: ignore[reportAttributeAccessIssue] assume status is already there
-
-            # TODO: add other properties, but do not touch linked elements - they are processed by top level iterator
-            mapping[(x._model.uuid, x.uuid)] = (newComp, False)
-
-    return True
+    return recordMatch(matchList, x, destParent, targetCollection, mapping)

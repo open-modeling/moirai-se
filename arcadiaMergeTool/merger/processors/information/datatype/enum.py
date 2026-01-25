@@ -1,4 +1,3 @@
-import capellambse.metamodel.capellacore as cc
 import capellambse.metamodel.information as inf
 import capellambse.metamodel.information.datatype as dt
 from capellambse import helpers
@@ -8,13 +7,48 @@ from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
 
-from arcadiaMergeTool.merger.processors._processor import process, doProcess
+import capellambse.model as m
+from arcadiaMergeTool.merger.processors._processor import clone, process, doProcess, recordMatch
 
 LOGGER = getLogger(__name__)
 
+T = dt.Enumeration
+
+@clone.register
+def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
+    newComp = coll.create(helpers.xtype_of(x._element),
+        description = x.description,
+        is_abstract = x.is_abstract,
+        is_discrete = x.is_discrete,
+        is_final = x.is_final,
+        is_max_inclusive = x.is_max_inclusive,
+        is_min_inclusive = x.is_min_inclusive,
+        is_visible_in_doc = x.is_visible_in_doc,
+        is_visible_in_lm = x.is_visible_in_lm,
+        name = x.name,
+        pattern = x.pattern,
+        review = x.review,
+        sid = x.sid,
+        summary = x.summary,
+        visibility = x.visibility,
+    ) 
+
+    # newComp.null_value = x.null_value
+    # newComp.max_value = x.max_value
+    # newComp.min_value = x.min_value
+    # newComp.domain_type = x.domain_type
+    # newComp.default_value = x.default_value
+
+    if x.super is not None:
+        newComp.super = x.super
+    if x.status is not None:
+        newComp.status = x.status
+
+    return newComp
+
 @process.register
 def _(
-    x: dt.Enumeration,
+    x: T,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
@@ -84,54 +118,6 @@ def _(
 
     # use weak match by name
     # TODO: implement strong match by PVMT properties
-    matchingPropertyValuePackages = list(filter(lambda y: y.name == x.name, targetCollection))
+    matchList = list(filter(lambda y: y.name == x.name, targetCollection))
 
-    if (len(matchingPropertyValuePackages) > 0):
-        # assume it's same to take first, but theme might be more
-        mapping[(x._model.uuid, x.uuid)] = (matchingPropertyValuePackages[0], False)
-    else:
-        LOGGER.debug(
-            f"[{process.__qualname__}] Create new Property Value Groups name [%s], uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
-            x.name,
-            x.uuid,
-            x.parent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-            x.parent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-            x.parent.__class__,
-            destParent.name,
-            destParent.uuid,
-            destParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
-
-        newComp = targetCollection.create(xtype=helpers.qtype_of(x._element),
-        ) 
-        newComp.description = x.description
-        newComp.is_abstract = x.is_abstract
-        newComp.is_discrete = x.is_discrete
-        newComp.is_final = x.is_final
-        newComp.is_max_inclusive = x.is_max_inclusive
-        newComp.is_min_inclusive = x.is_min_inclusive
-        newComp.is_visible_in_doc = x.is_visible_in_doc
-        newComp.is_visible_in_lm = x.is_visible_in_lm
-        newComp.name = x.name
-        newComp.pattern = x.pattern
-        newComp.review = x.review
-        newComp.sid = x.sid
-        newComp.summary = x.summary
-        newComp.visibility = x.visibility
-
-        # newComp.null_value = x.null_value
-        # newComp.max_value = x.max_value
-        # newComp.min_value = x.min_value
-        # newComp.domain_type = x.domain_type
-        # newComp.default_value = x.default_value
-
-        if x.super is not None:
-            newComp.super = x.super
-        if x.status is not None:
-            newComp.status = x.status
-
-        mapping[(x._model.uuid, x.uuid)] = (newComp, False)
-
-    return True
+    return recordMatch(matchList, x, destParent, targetCollection, mapping)
