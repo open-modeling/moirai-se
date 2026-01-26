@@ -72,7 +72,7 @@ def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
 
 @process.register
 def _(
-    x: mm.fa.AbstractFunction | mm.sa.SystemFunction | mm.la.LogicalFunction | mm.pa.PhysicalFunction | mm.oa.OperationalActivity,
+    x: T,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,

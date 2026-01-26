@@ -279,6 +279,7 @@ def _(
         mappedPort = mapping.get((port._model.uuid, port.uuid))
         if not mappedPort:
             # coming here means that component was directly added into the model, not taken from the library
+            # TODO: add to report
             LOGGER.error(
                 f"[{process.__qualname__}] Non-library Physical Port detected. Physical Port name [%s], uuid [%s], target port name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
                 x.name,
@@ -291,11 +292,9 @@ def _(
                 x._model.uuid,
             )
             mapping[(x._model.uuid, x.uuid)] = (port, False)
-            # mapping[(port._model.uuid, port.uuid)] = (port, False)
     else:
         # port without links
         newPort = __createCompoentPort(x, targetCollection)
-        # mapping[(newPort._model.uuid, newPort.uuid)] = (newPort, False)
         mapping[(x._model.uuid, x.uuid)] = (newPort, False)
 
     return True

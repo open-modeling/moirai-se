@@ -1,50 +1,17 @@
-import capellambse.metamodel as mm
-from capellambse import helpers
+import capellambse.metamodel.information.datavalue as dv
+import capellambse.metamodel.information.datatype as dt
+import capellambse.metamodel.capellacore as cc
 
-from arcadiaMergeTool.helpers import ExitCodes
+from arcadiaMergeTool.helpers import ExitCodes, create_element
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
 
-import capellambse.model as m
-from arcadiaMergeTool.merger.processors._processor import clone, process, doProcess, recordMatch
-
-from . import allocation, element
-
-__all__ = [
-    "allocation",
-    "element",
-]
+from arcadiaMergeTool.merger.processors._processor import process, doProcess
 
 LOGGER = getLogger(__name__)
 
-T = mm.information.ExchangeItem
-
-@clone.register
-def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
-    newComp = coll.create(helpers.xtype_of(x._element),
-        exchange_mechanism = x.exchange_mechanism,
-        is_abstract = x.is_abstract,
-        is_final = x.is_final,
-        is_visible_in_doc = x.is_visible_in_doc,
-        is_visible_in_lm = x.is_visible_in_lm,
-        name = x.name,
-        review = x.review,
-        sid = x.sid,
-        summary = x.summary,
-    ) 
-
-    # TODO: fix PVMT
-    # .property_value_groups = []
-    # .property_values = []
-    # .pvmt = 
-
-    if x.status is not None:
-        newComp.status = x.status
-    if x.super is not None:
-        newComp.super = x.super
-
-    return newComp
+T = dv.OpaqueExpression
 
 @process.register
 def _(
@@ -54,18 +21,18 @@ def _(
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ) -> bool:
-    """Find and merge Exchange Items
+    """Find and merge Literal Values
 
     Parameters
     ==========
     x:
-        Exchange Item to process
+        Literal Value to process
     dest:
-        Destination model to add Exchange Items to
+        Destination model to add Literal Values to
     src:
-        Source model to take Exchange Items from
+        Source model to take Literal Values from
     base:
-        Base model to check Exchange Items against
+        Base model to check Literal Values against
     mapping:
         Full mapping of the elements to the corresponding models
 
@@ -97,13 +64,28 @@ def _(
 
     (destParent, fromLibrary) = destParentEntry
 
-    targetCollection = None
+    el = None
+    if (isinstance(destParent, dv.BinaryExpression)
+        or isinstance(destParent, dt.NumericType)
+        or isinstance(destParent, dt.BooleanType)
+        or isinstance(destParent, cc.Constraint)):
+        el =create_element(dest.model, destParent, x)
 
-    if isinstance(destParent, mm.cs.InterfacePkg):
-        targetCollection = destParent.exchange_items
+        el.bodies = x.bodies
+        el.languages = x.languages
+        el.description = x.description
+        el.is_visible_in_doc = x.is_visible_in_doc
+        el.is_visible_in_lm = x.is_visible_in_lm
+        el.name = x.name
+        el.review = x.review
+        el.sid = x.sid
+        el.summary = x.summary
+
+        if x.status is not None:
+            el.status = x.status
     else:
         LOGGER.fatal(
-            f"[{process.__qualname__}] Exchange Item parent is not a valid parent, Exchange Item name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+            f"[{process.__qualname__}] Literal Values parent is not a valid parent, Literal Values name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
             x.name,
             x.uuid,
             x.__class__,
@@ -115,8 +97,6 @@ def _(
         )
         exit(str(ExitCodes.MergeFault))
 
-    # use weak match by name
-    # TODO: implement strong match by PVMT properties
-    matchList = list(filter(lambda y: y.name == x.name, targetCollection)) # pyright: ignore[reportAttributeAccessIssue] expect name is there
-
-    return recordMatch(matchList, x, destParent, targetCollection, mapping)
+    mapping[(x._model.uuid, x.uuid)] = (el, False)
+    
+    return True

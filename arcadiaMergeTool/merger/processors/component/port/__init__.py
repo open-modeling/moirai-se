@@ -1,7 +1,6 @@
 import capellambse.metamodel as mm
 import capellambse.model as m
 from capellambse import helpers
-from capellambse.model import ModelElement
 
 from arcadiaMergeTool.helpers import ExitCodes
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
@@ -9,6 +8,12 @@ from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
 
 from arcadiaMergeTool.merger.processors._processor import process, doProcess
+
+from . import allocation
+
+__all__ = [
+    "allocation"
+]
 
 LOGGER = getLogger(__name__)
 
@@ -277,7 +282,6 @@ def _(
     else:
         # port without exchanges
         newPort = __createCompoentPort(x, targetCollection)
-        mapping[(newPort._model.uuid, newPort.uuid)] = (newPort, False)
         mapping[(x._model.uuid, x.uuid)] = (newPort, False)
 
     return True

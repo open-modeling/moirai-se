@@ -180,6 +180,7 @@ def _(
 
     if ex is not False:
         # coming here means that component exchange was added in a project, not taken from the library
+        # TODO: add to report
         LOGGER.error(
             f"[{process.__qualname__}] Non-library component exchange detected. Component exchange name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
             x.name,

@@ -12,7 +12,7 @@ from arcadiaMergeTool.merger.processors._processor import process, doProcess
 
 LOGGER = getLogger(__name__)
 
-def __findMatchingLink(targetCollection, srcLink, 
+def __findMatchingLink(targetCollection: m.ElementList[mm.pa.deployment.PartDeploymentLink], srcLink: mm.pa.deployment.PartDeploymentLink, 
                            mappedSourcFuncEntry: MergerElementMappingEntry | None, 
                            mappedTargetFuncEntry: MergerElementMappingEntry | None, 
                            mapping: MergerElementMappingMap) -> ModelElement | bool:
@@ -40,7 +40,8 @@ def __findMatchingLink(targetCollection, srcLink,
 
         # NOTE: weak match against Part Deployment Link name
         # TODO: replace weak match with PVMT based strong match
-        if tgtLink.name == srcLink.name:
+        if (srcLink.deployed_element is not None and tgtLink.deployed_element is not None
+            and tgtLink.deployed_element.name == srcLink.deployed_element.name):
             # for case of name we have to do complex check
             # 1. there might be several Part Deployment Links with the same name
             # 2. Part Deployment Link is mapped before Comp and may have empty source and target
@@ -52,8 +53,8 @@ def __findMatchingLink(targetCollection, srcLink,
                 # True means that Part Deployment Link processing must be postponed
                 return True
 
-            tgtLinkMappedSourceFunc = mapping.get((tgtLink._model.uuid, tgtLink.deployed_element.parent.uuid))
-            tgtLinkMappedTargetFunc = mapping.get((tgtLink._model.uuid, tgtLink.location.parent.uuid))
+            tgtLinkMappedSourceFunc = mapping.get((tgtLink._model.uuid, tgtLink.deployed_element.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue] expect deployed_element is there
+            tgtLinkMappedTargetFunc = mapping.get((tgtLink._model.uuid, tgtLink.location.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue] expect location is there
 
             if tgtLinkMappedSourceFunc is not None and tgtLinkMappedTargetFunc is not None and tgtLinkMappedSourceFunc == mappedSourcFuncEntry and tgtLinkMappedTargetFunc == mappedTargetFuncEntry:
                 # if name, source function and target function are equal, map existing Part Deployment Link to a candidate
@@ -159,8 +160,7 @@ def _(
         # postpone exececution on boolean true
         # TODO: add more convenient return type
         LOGGER.debug(
-            f"[{process.__qualname__}] No Part Deployment Link match, postpone processing of Part Deployment Link name [%s], uuid [%s], model name [%s], uuid [%s]",
-            x.name,
+            f"[{process.__qualname__}] No Part Deployment Link match, postpone processing of Part Deployment Link uuid [%s], model name [%s], uuid [%s]",
             x.uuid,
             x._model.name,
             x._model.uuid,
@@ -169,10 +169,12 @@ def _(
 
     if ex is not False:
         # coming here means that Part Deployment Link was added in a project, not taken from the library
+        # TODO: add to report
         LOGGER.error(
-            f"[{process.__qualname__}] Non-library Part Deployment Link detected. Part Deployment Link name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
-            x.name,
+            f"[{process.__qualname__}] Non-library Part Deployment Link detected. Part Deployment Link uuid [%s], deployed element [%s], uuid [%s], arent name [%s], uuid [%s], model name [%s], uuid [%s]",
             x.uuid,
+            x.deployed_element.name, # pyright: ignore[reportOptionalMemberAccess] expect element is there
+            x.deployed_element.uuid, # pyright: ignore[reportOptionalMemberAccess] expect element is there
             destParent.name,
             destParent.uuid,
             x._model.name,
@@ -184,9 +186,10 @@ def _(
     else:
 
         LOGGER.debug(
-            f"[{process.__qualname__}] Create a non-library Part Deployment Link name [%s], uuid [%s], model name [%s], uuid [%s]",
-            x.name,
+            f"[{process.__qualname__}] Create a non-library Part Deployment Link uuid [%s], deployed element [%s], uuid [%s], model name [%s], uuid [%s]",
             x.uuid,
+            x.deployed_element.name, # pyright: ignore[reportOptionalMemberAccess] expect element is there
+            x.deployed_element.uuid, # pyright: ignore[reportOptionalMemberAccess] expect element is there
             x._model.name,
             x._model.uuid,
         )

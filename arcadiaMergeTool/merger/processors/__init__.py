@@ -13,7 +13,9 @@ from . import sa
 from . import se
 from . import abstract
 from . import capability
+from . import change_event
 from . import component
+from . import constraint
 from . import context
 from . import function
 from . import functional
@@ -30,7 +32,9 @@ LOGGER = getLogger(__name__)
 __all__ = [
     "abstract",
     "capability",
+    "change_event",
     "component",
+    "constraint",
     "context",
     "function",
     "functional",

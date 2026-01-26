@@ -13,8 +13,6 @@ T = cs.InterfacePkg
 
 @clone.register
 def _ (x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
-    print (coll)
-    print (x)
     newComp = coll.create(helpers.xtype_of(x._element),
         description = x.description,
         is_visible_in_doc = x.is_visible_in_doc,

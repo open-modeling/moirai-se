@@ -9,6 +9,8 @@ from pathlib import Path
 
 import yaml
 
+from arcadiaMergeTool.helpers.types import ModelElement_co
+
 class ExitCodes(Enum):
     OK = 0,
     Fail = 1,
@@ -31,7 +33,7 @@ def _gen_id(prefix: str = "ID", name: str|None = None) -> str:
     """Generate unique identifier"""
     return f"{prefix}_{shortuuid.uuid(name)}"
 
-def create_element(model: MelodyModel, parent, source):
+def create_element(model: MelodyModel, parent, source: ModelElement_co) -> ModelElement_co:
     pel = parent._element
     el = source._element
     
@@ -42,9 +44,6 @@ def create_element(model: MelodyModel, parent, source):
             continue
         attrib[k] = i
 
-    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-    print(el.attrib)
-    print(attrib)
     if el.attrib["id"] == "a6dd668c-1079-4b99-9560-771a42349471":
         exit()
 

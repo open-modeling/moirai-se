@@ -152,8 +152,8 @@ def _(
     # 
     # In both cases - iterate through the linkss and match them by name
 
-    doProcess(x.source, dest, src, base, mapping)
-    doProcess(x.target, dest, src, base, mapping)
+    doProcess(x.source, dest, src, base, mapping) # pyright: ignore[reportArgumentType] expect source exists
+    doProcess(x.target, dest, src, base, mapping) # pyright: ignore[reportArgumentType] expect target exists
 
     sourceComponentMap = mapping.get((x.source.parent._model.uuid, x.source.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect source exists in this context
     targetComponentMap = mapping.get((x.target.parent._model.uuid, x.target.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect target exists in this context
@@ -178,6 +178,7 @@ def _(
 
     if ex is not False:
         # coming here means that Physical Link was added in a project, not taken from the library
+        # TODO: add to report
         LOGGER.error(
             f"[{process.__qualname__}] Non-library Physical Link detected. Physical Link name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
             x.name,
@@ -214,9 +215,6 @@ def _(
         # .property_value_groups = []
         # .property_values = []
         # .pvmt = 
-
-        # TODO: find a way to copy these properties
-        # newComp.progress_status = x.progress_status
 
         if x.status is not None:
             newComp.status = x.status

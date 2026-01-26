@@ -11,19 +11,9 @@ from arcadiaMergeTool import getLogger
 import capellambse.model as m
 from arcadiaMergeTool.merger.processors._processor import clone, process, doProcess, recordMatch
 
-from . import binary_expression, boolean, enumeration, numeric_reference, opaque_expression
-
-__all__ = [
-    "binary_expression",
-    "boolean",
-    "enumeration",
-    "numeric_reference",
-    "opaque_expression",
-]
-
 LOGGER = getLogger(__name__)
 
-T = dv.LiteralNumericValue | dv.LiteralStringValue
+T = dv.EnumerationLiteral
 
 @clone.register
 def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
@@ -37,8 +27,7 @@ def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
     newComp.review = x.review # pyright: ignore[reportAttributeAccessIssue]
     newComp.sid = x.sid # pyright: ignore[reportAttributeAccessIssue]
     newComp.summary = x.summary # pyright: ignore[reportAttributeAccessIssue]
-    newComp.value = x.value # pyright: ignore[reportAttributeAccessIssue]
-
+    # newComp.value = x.value # pyright: ignore[reportAttributeAccessIssue]
 
     # TODO: fix PVMT
     # .applied_property_value_groups = 
@@ -50,9 +39,6 @@ def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
 
     if x.status is not None:
         newComp.status = x.status
-    if x.unit is not None:
-        mappedType = mapping[(x._model.uuid, x.unit.uuid)]
-        newComp.unit = mappedType[0]
 
     return newComp
 
@@ -88,9 +74,7 @@ def _(
 
     # recursively check all direct parents for existence and continue only if parents agree
     modelParent = x.parent
-    if (not doProcess(modelParent, dest, src, base, mapping) # pyright: ignore[reportArgumentType] expect modelParent is compatible with ModelElement
-        or not doProcess(x.unit, dest, src, base, mapping) # pyright: ignore[reportArgumentType] expect modelParent is compatible with ModelElement
-    ):
+    if (not doProcess(modelParent, dest, src, base, mapping)): # pyright: ignore[reportArgumentType] expect modelParent is compatible with ModelElement
         # unit is vital property, wait for it
         return False
     

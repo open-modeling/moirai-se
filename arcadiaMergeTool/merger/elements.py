@@ -40,7 +40,6 @@ def _makeModelElementList(
             and not isinstance(x, li.LibraryReference)
             and not isinstance(x, li.ModelInformation),
             model.model.search(ModelElement, below=model.model.project),
-            # model.model.search(mm.fa.ComponentFunctionalAllocation, below=model.model.project)
         )
     )
     if clsname is not None:

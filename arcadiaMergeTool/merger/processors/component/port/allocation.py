@@ -11,12 +11,16 @@ from arcadiaMergeTool.merger.processors._processor import clone, process, doProc
 
 LOGGER = getLogger(__name__)
 
-T =  mm.fa.FunctionalChainInvolvement
+T = mm.fa.ComponentPortAllocation
 
 @clone.register
 def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
     newComp = coll.create(helpers.xtype_of(x._element),
-        involved = mapping.get((x._model.uuid, x.involved.uuid))[0], # pyright: ignore[reportOptionalMemberAccess, reportOptionalSubscript] expect target is already there
+        source = mapping.get((x._model.uuid, x.source.uuid))[0], # pyright: ignore[reportOptionalMemberAccess, reportOptionalSubscript] expect source is already there
+        target = mapping.get((x._model.uuid, x.target.uuid))[0], # pyright: ignore[reportOptionalMemberAccess, reportOptionalSubscript] expect target is already there
+        description = x.description,
+        is_visible_in_doc = x.is_visible_in_doc,
+        is_visible_in_lm = x.is_visible_in_lm,
         review = x.review,
         sid = x.sid,
         summary = x.summary,
@@ -42,18 +46,18 @@ def _(
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ) -> bool:
-    """Find and merge Functional Chain Involvement Function
+    """Find and merge Component Port Allocations
 
     Parameters
     ==========
     x:
-        Functional Exchange Realization to process
+        Component Port Allocation to process
     dest:
-        Destination model to add Functional Chain Involvement Function to
+        Destination model to add Component Port Allocations to
     src:
-        Source model to take Functional Chain Involvement Function from
+        Source model to take Component Port Allocations from
     base:
-        Base model to check Functional Chain Involvement Function against
+        Base model to check Component Port Allocations against
     mapping:
         Full mapping of the elements to the corresponding models
 
@@ -68,8 +72,9 @@ def _(
     if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of tyoe ModelElement
         # safeguard for direct call
         return False
-    
+
     destParentEntry = mapping.get((modelParent._model.uuid, modelParent.uuid)) # pyright: ignore[reportAttributeAccessIssue] expect ModelElement here with valid uuid
+    
     if destParentEntry is None:
         LOGGER.fatal(f"[{process.__qualname__}] Element parent was not found in cache, uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
             x.uuid,
@@ -86,12 +91,12 @@ def _(
 
     targetCollection = None
 
-    if (isinstance(destParent, mm.fa.FunctionalChain)
+    if (isinstance(destParent, mm.cs.PhysicalPort)
     ):
-        targetCollection = destParent.involvements
+        targetCollection = destParent.component_port_allocations
     else:
         LOGGER.fatal(
-            f"[{process.__qualname__}] Functional Exchange Realization parent is not a valid parent, Functional Exchange Realization uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+            f"[{process.__qualname__}] Component Port Allocation parent is not a valid parent, Port uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
             x.uuid,
             x.__class__,
             destParent.name,
@@ -102,11 +107,12 @@ def _(
         )
         exit(str(ExitCodes.MergeFault))
 
-    mappedInvolved = mapping.get((x._model.uuid, x.involved.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect target is already there
-    if mappedInvolved is None:
-        # postpone processing until involved function resolved
+    mappedSource = mapping.get((x._model.uuid, x.source.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect source is already there
+    mappedTarget = mapping.get((x._model.uuid, x.target.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect target is already there
+    if mappedSource is None or mappedTarget is None:
+        # if source or target is not mapped, postpone allocation processing
         return False
     
-    matchList = list(filter(lambda y: y.parent == mappedInvolved[0], targetCollection)) # pyright: ignore[reportOptionalSubscript] check for none is above, mappedSource and mappedTarget are safe
+    matchList = list(filter(lambda y: y.source == mappedSource[0] and x.target == mappedTarget[0], targetCollection)) # pyright: ignore[reportOptionalSubscript] check for none is above, mappedSource and mappedTarget are safe
 
     return recordMatch(matchList, x, destParent, targetCollection, mapping)

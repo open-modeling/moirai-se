@@ -113,11 +113,9 @@ def doProcess (
     src: CapellaMergeModel,
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
-) -> bool:
-
-    if x == x._model.project:
-        # edge case, root node reached
-        mapping[(x._model.uuid, x.uuid)] = (x, False)
+):
+    if x is None:
+        return True
 
     cachedElement = mapping.get((x._model.uuid, x.uuid))
 
@@ -140,8 +138,9 @@ def doProcess (
                 x._model.uuid,
             )
 
-        # if not doProcess(x.parent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect parent is valid here
-        #     return False
+        #######################################
+        # PREPROCESSORS
+        #######################################
 
         if isinstance(x, mc.AbstractTypedElement) and x.type is not None:
             # HACK: add pre-processors
@@ -152,11 +151,29 @@ def doProcess (
             elif not doProcess(x.type, dest, src, base, mapping):
                 return False
 
+        # if (isinstance(x, cc.CapellaElement)):
+
+        #     for p in x.applied_property_values:
+        #         mappedPV = mapping.get((p._model.uuid, p.uuid))
+        #         if mappedPV is None:
+        #             return False
+
+        #     for p in x.applied_property_value_groups:
+        #         mappedPVG = mapping.get((p._model.uuid, p.uuid))
+        #         if mappedPVG is None:
+        #             return False
+        #######################################
+        # PREPROCESSORS END
+        #######################################
+
+
         if not process(x, dest, src, base, mapping):
             return False
 
+        #######################################
+        # POSTROCESSORS
+        #######################################
         mappedX = mapping.get((x._model.uuid, x.uuid)) # pyright: ignore[reportAssignmentType] expect correct element type in this position
-
         if mappedX is not None:
             mappedXEl = mappedX[0]
             if x.__class__ != mappedXEl.__class__:
@@ -187,27 +204,32 @@ def doProcess (
             if (isinstance(mappedXEl, cc.CapellaElement)):
 
                 for p in x.applied_property_values:
-                    mappedPV = mapping.get((p._model.uuid, p.uuid))
-                    if mappedPV is None:
-                        return False
-                    mappedXEl.applied_property_values.append(mappedPV[0])
+                    if doProcess(p, dest, src, base, mapping):
+                        mappedXEl.applied_property_values.append(mapping[(p._model.uuid, p.uuid)][0])
+                    else:
+                        LOGGER.fatal(
+                            f"[{doProcess.__qualname__}] Component could not be resolved in post-processing name [%s], uuid [%s], class [%s]",
+                            p.name,
+                            p.uuid,
+                            p.__class__,
+                        )
+                        exit(str(ExitCodes.MergeFault))
 
                 for p in x.applied_property_value_groups:
-                    mappedPVG = mapping.get((p._model.uuid, p.uuid))
-                    if mappedPVG is None:
-                        return False
-                    mappedXEl.applied_property_values.append(mappedPVG[0])
+                    if doProcess(p, dest, src, base, mapping):
+                        mappedXEl.applied_property_value_groups.append(mapping[(p._model.uuid, p.uuid)][0])
+                    else:
+                        LOGGER.fatal(
+                            f"[{doProcess.__qualname__}] Component could not be resolved in post-processing name [%s], uuid [%s], class [%s]",
+                            p.name,
+                            p.uuid,
+                            p.__class__,
+                        )
+                        exit(str(ExitCodes.MergeFault))
 
-            if x.name == "Control Steering system according to active Steering Mode":
-                print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                print(f"!!!!!!!!!!!!!!!      {mappedXEl}             !!!!!!!!!!!!!!")
-                print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                exit()
-
+        #######################################
+        # POSTPROCESSORS END
+        #######################################
 
     else:
         (cachedFunction, fromLibrary) = cachedElement
