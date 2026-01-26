@@ -1,0 +1,30 @@
+project:
+  name: test project
+  author: ""
+  basePath: ./
+base:
+  name: baseLib
+  projectPath: lib/baseLib
+target:
+  name: emptyModel
+  projectPath: lib/emptyModel
+  libs:
+    - name: baseLib
+      path: lib/baseLib
+models:
+  - name: System 1
+    projectPath: test data/Test 1/System1
+    libs: 
+      - name: baseLib
+        path: lib/baseLib
+  - name: System 2
+    projectPath: test data/Test 1/System2
+    libs: 
+      - name: baseLib
+        path: lib/baseLib
+  - name: System 3
+    projectPath: test data/Test 1/System3
+    libs: 
+      - name: baseLib
+        path: lib/baseLib
+ 

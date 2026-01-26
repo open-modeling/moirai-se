@@ -1,0 +1,31 @@
+project:
+  name: chassis
+  author: ""
+  basePath: ../models
+base:
+  name: product-configuration
+  projectPath: product-configuration
+target:
+  name: chassis
+  projectPath: chassis
+  libs: 
+    - product-configuration
+models:
+  - name: braking
+    projectPath: braking
+    libs: 
+      - product-configuration
+    gitModelAttrib: 
+    gitLibAttrib: 
+  - name: steering
+    projectPath: steering
+    libs:
+      - product-configuration
+    gitModelAttrib: 
+    gitLibAttrib: 
+  - name: tpms
+    projectPath: tpms
+    libs:
+      - product-configuration
+    gitModelAttrib: 
+    gitLibAttrib: 
