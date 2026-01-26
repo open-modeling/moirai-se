@@ -35,11 +35,11 @@ def merge(config: ConfigModel):
 
     modelSrc = []
     modelDst = CapellaMergeModel(targetModel, mergerConfig)
-    modelBase = CapellaMergeModel(model=baseModel, config=mergerConfig)
+    modelBase = CapellaMergeModel(baseModel, mergerConfig)
 
     for item in extModels:
         LOGGER.debug(f"[{merge.__name__}] processing external models item ({item})")
-        model = CapellaMergeModel(item, config=mergerConfig)
+        model = CapellaMergeModel(item, mergerConfig)
 
         modelSrc.append(model)
 
@@ -50,4 +50,3 @@ def merge(config: ConfigModel):
     mergeElements(modelDst, modelBase, modelSrc, elementMappingMap)
 
     modelDst.save()
-

@@ -19,7 +19,7 @@ class CapellaMergeModel:
 
         for lib in model.libs:
             logger.debug(f"[CapellaMergeModel.__init__] adding model {model.name} resource {lib}")
-            resources[lib] = {'path': os.path.join(config.basePath, lib)}
+            resources[lib.name] = {'path': os.path.join(config.basePath, lib.path)}
 
         path = os.path.join(self.path)
 
@@ -28,7 +28,9 @@ class CapellaMergeModel:
 
         modelRefs: dict[str, Any] = {'revision': model.gitModelAttrib} if model.gitModelAttrib is not None else {}
 
-        self.model = capellambse.MelodyModel(path=path, resources = resources, **modelRefs)
+        print ("!!!", path, config.basePath)
+        print(resources)
+        self.model = capellambse.MelodyModel(path=path, resources=resources, **modelRefs)
 
     def save(self):
         self.model.name = self.config.name

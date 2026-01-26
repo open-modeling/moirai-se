@@ -1,12 +1,19 @@
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
 
+class LibRecord(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: str
+    path: str
+
 class ConfigProjectModel(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
     name: str
-    libs: List[str] = []
+    libs: List[LibRecord] = []
     gitModelAttrib: Optional[str] = None
     gitLibAttrib: Optional[str] = None
     projectPath: str
