@@ -510,7 +510,11 @@
               kind="FLOW"/>
           <ownedFeatures xsi:type="org.polarsys.capella.core.data.fa:ComponentPort"
               id="23f3071c-2e65-48f4-924b-f6bef89fa18f" name="CP 3" orientation="OUT"
-              kind="FLOW"/>
+              kind="FLOW">
+            <ownedPortAllocations xsi:type="org.polarsys.capella.core.data.information:PortAllocation"
+                id="957a502d-4d6e-4a13-8a51-671a72d0119c" targetElement="#099c4151-c024-4a62-8a6e-e5271ded01fe"
+                sourceElement="#23f3071c-2e65-48f4-924b-f6bef89fa18f"/>
+          </ownedFeatures>
           <ownedFeatures xsi:type="org.polarsys.capella.core.data.fa:ComponentPort"
               id="7b8a642b-becc-4b0c-8eb8-664176e7a27a" name="CP 5" orientation="IN"
               kind="FLOW"/>
