@@ -1,6 +1,6 @@
-# What is _moirai-se_?
+# What is _Moirai-SE_?
 
-`moirai-se` is an open-source Python toolkit for **model composition** in Capella/ARCADIA-based MBSE: it merges independently-developed sub-product models into a coherent “product” model baseline and prepares the result for automation-friendly (CI) workflows.
+`Moirai-SE` is an open-source Python toolkit for **model composition** in Capella/ARCADIA-based MBSE: it merges independently-developed sub-product models into a coherent “product” model baseline and prepares the result for automation-friendly (CI) workflows.
 
 | | |
 |---| ---|
