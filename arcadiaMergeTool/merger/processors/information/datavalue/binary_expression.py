@@ -41,7 +41,9 @@ def _(
         return True
 
     modelParent = x.parent
-    if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of tyoe ModelElement
+    if (not doProcess(modelParent, dest, src, base, mapping) # pyright: ignore[reportArgumentType] expect modelParent is of type ModelElement
+        or not doProcess(x.type, dest, src, base, mapping) # pyright: ignore[reportArgumentType] expect modelParent is of type ModelElement
+    ):
         # safeguard for direct call
         return False
 
@@ -80,6 +82,9 @@ def _(
 
         if x.status is not None:
             el.status = x.status
+        if x.type is not None:
+            mappedType = mapping[(x._model.uuid, x.type.uuid)]
+            el.type = mappedType[0]
         if x.unit is not None:
             mappedType = mapping[(x._model.uuid, x.unit.uuid)]
             el.unit = mappedType[0]

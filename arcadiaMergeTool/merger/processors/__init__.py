@@ -13,6 +13,7 @@ from . import sa
 from . import se
 from . import abstract
 from . import capability
+from . import catalog
 from . import change_event
 from . import component
 from . import constraint
@@ -32,6 +33,7 @@ LOGGER = getLogger(__name__)
 __all__ = [
     "abstract",
     "capability",
+    "catalog",
     "change_event",
     "component",
     "constraint",

@@ -15,50 +15,17 @@ T = mm.capellacommon.StateMachine
 
 @clone.register
 def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
-    print(x)
-    exit()
-    
+
     newComp = coll.create(helpers.xtype_of(x._element),
-        aggregation_kind = x.aggregation_kind,
-        condition = x.condition,
         description = x.description,
-        is_abstract = x.is_abstract,
-        is_derived = x.is_derived,
-        is_final = x.is_final,
-        is_max_inclusive = x.is_max_inclusive,
-        is_min_inclusive = x.is_min_inclusive,
-        is_ordered = x.is_ordered,
-        is_part_of_key = x.is_part_of_key,
-        is_read_only = x.is_read_only,
-        is_static = x.is_static,
-        is_unique = x.is_unique,
+        is_control_operator = x.is_control_operator,
         is_visible_in_doc = x.is_visible_in_doc,
         is_visible_in_lm = x.is_visible_in_lm,
-        kind = x.kind,
         name = x.name,
         review = x.review,
         sid = x.sid,
         summary = x.summary,
-        visibility = x.visibility,
     ) 
-
-    # TODO: fix PVMT
-    # .property_value_groups = []
-    # .property_values = []
-    # .pvmt = 
-
-    # TODO: find a way to copy these properties
-    # newComp.behavior = x.behavior
-    # newComp.default_value = x.default_value
-    # newComp.local_postcondition = x.local_postcondition
-    # newComp.local_precondition = x.local_precondition
-    # newComp.max_card = x.max_card
-    # newComp.max_length = x.max_length
-    # newComp.max_value = x.max_value
-    # newComp.min_card = x.min_card
-    # newComp.min_length = x.min_length
-    # newComp.min_value = x.min_value
-    # newComp.null_value = x.null_value
 
     if x.status is not None:
         newComp.status = x.status
@@ -96,7 +63,7 @@ def _(
         return True
 
     modelParent = x.parent
-    if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of tyoe ModelElement
+    if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of type ModelElement
         # safeguard for direct call
         return False
 

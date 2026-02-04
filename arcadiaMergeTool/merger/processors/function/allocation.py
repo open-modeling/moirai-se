@@ -69,7 +69,7 @@ def _(
         return True
 
     modelParent = x.parent
-    if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of tyoe ModelElement
+    if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of type ModelElement
         # safeguard for direct call
         return False
 
@@ -90,13 +90,9 @@ def _(
 
     targetCollection = None
 
-    if (isinstance(destParent, mm.oa.Entity)
-        or isinstance(destParent, mm.cs.Component)
-        or isinstance(destParent, mm.pa.PhysicalComponent)
-        or isinstance(destParent, mm.sa.SystemComponent)
-        or isinstance(destParent, mm.la.LogicalComponent)
+    if (isinstance(destParent, mm.fa.AbstractFunctionalBlock)
     ):
-        targetCollection = destParent.functional_allocations # pyright: ignore[reportAttributeAccessIssue] expect allocated_functions exists
+        targetCollection = destParent.functional_allocations
     else:
         LOGGER.fatal(
             f"[{process.__qualname__}] Function Allocation parent is not a valid parent, Function uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
@@ -115,7 +111,7 @@ def _(
     if mappedSource is None or mappedTarget is None:
         # if source or target is not mapped, postpone allocation processing
         return False
-    
+
     matchList = list(filter(lambda y: y.source == mappedSource[0] and x.target == mappedTarget[0], targetCollection)) # pyright: ignore[reportOptionalSubscript] check for none is above, mappedSource and mappedTarget are safe
 
     return recordMatch(matchList, x, destParent, targetCollection, mapping)

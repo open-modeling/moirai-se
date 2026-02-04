@@ -17,7 +17,11 @@ __all__ = [
 
 LOGGER = getLogger(__name__)
 
-def __findMatchingPort(targetCollection, srcExch, destParent, source: bool)-> mm.fa.ComponentPort | None:
+T =  mm.fa.ComponentPort
+U = mm.fa.ComponentExchange
+V = mm.cs.Component
+
+def __findMatchingPort(x: T, targetCollection: m.ElementList[T], destParent: V, srcExch: U | None = None)-> T | None:
     """Find port based on exchange props
     
     Parameters
@@ -31,14 +35,20 @@ def __findMatchingPort(targetCollection, srcExch, destParent, source: bool)-> mm
     =======
     Matching port or None
     """
-    for port in targetCollection:
-        for ex in port.exchanges:
-            # NOTE: weak match against exchange name
-            # TODO: replace weak match with PVMT based strong match
-            if ex.name == srcExch.name and port.parent == destParent and ((source and ex.source is None) or (not source and ex.target is None)) :
+    if srcExch is None:
+        for port in targetCollection:
+            if len(port.exchanges) == 0 and port.name == x.name:
                 return port
+    else:
+        for port in targetCollection:
+            for ex in port.exchanges:
+                # NOTE: weak match against exchange name
+                # TODO: replace weak match with PVMT based strong match
+                if ex.name == srcExch.name and port.parent == destParent and x.orientation == port.orientation:
+                    return port
 
-def __createCompoentPort(x: mm.fa.ComponentPort, targetCollection: m._obj.ElementList) -> mm.fa.ComponentPort:
+
+def __createCompoentPort(x: T, targetCollection: m.ElementList[T]) -> T:
     """Create port in model
 
     Parameters
@@ -106,7 +116,7 @@ def __createCompoentPort(x: mm.fa.ComponentPort, targetCollection: m._obj.Elemen
 
 @process.register
 def _(
-    x: mm.fa.ComponentPort,
+    x: T,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
@@ -124,7 +134,7 @@ def _(
         Source model to take component ports from
     base:
         Base model to check component ports against
-    mapping:
+    mapping:x
         Full mapping of the elements to the corresponding models
 
     Returns
@@ -135,7 +145,7 @@ def _(
         return True
 
     modelParent = x.parent
-    if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of tyoe ModelElement
+    if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of type ModelElement
         # safeguard for direct call
         return False
 
@@ -155,11 +165,9 @@ def _(
 
     (destParent, fromLibrary) = destParentEntry
 
-    targetCollection = None
+    targetCollection: m.ElementList[T]
 
-    if (isinstance(destParent, mm.sa.SystemComponentPkg)
-        or isinstance(destParent, mm.la.LogicalComponentPkg)
-        or isinstance(destParent, mm.pa.PhysicalComponent)
+    if (isinstance(destParent, mm.pa.PhysicalComponent)
         or isinstance(destParent, mm.la.LogicalComponent)
         or isinstance(destParent, mm.sa.SystemComponent)
     ):
@@ -209,17 +217,17 @@ def _(
                 x._model.uuid,
             )
             postpone = True
-            continue            
-
-        mappedEx = exMap[0]
+            continue
+        
+        mappedEx: U = exMap[0] # pyright: ignore[reportAssignmentType] expect it's correct type
         if ex.source == x:
             # when exchange is landed from source model it does not have port mapped
             # port mapping performed here to avoid recursive model processing
             if mappedEx.source is None:
                 # potential superset case - exchange exists, but not mapped
                 # find first matching port with exchange sharing same properties
-                port = __findMatchingPort(targetCollection, ex, destParent, True)
-                if port:
+                port= __findMatchingPort(x, targetCollection, destParent, ex)
+                if port is not None:
                     portCandidates[port.uuid] = port
                     mappedEx.source = port
                 else:
@@ -227,15 +235,17 @@ def _(
                     newPort = __createCompoentPort(x, targetCollection)
                     portCandidates[newPort.uuid] = newPort
                     mappedEx.source = newPort
-                    
-        if ex.target == x:
+                    mapping[(x._model.uuid, x.uuid)] = (newPort, False)
+            else:
+                portCandidates[mappedEx.source.uuid] = mappedEx.source
+        elif ex.target == x:
             # when exchange is landed from source model it does not have port mapped
             # port mapping performed here to avoid recursive model processing
             if mappedEx.target is None:
                 # potential superset case - exchange exists, but not mapped
                 # find first matching port with exchange sharing same properties
-                port = __findMatchingPort(targetCollection, ex, destParent, False)
-                if port:
+                port = __findMatchingPort(x, targetCollection, destParent, ex)
+                if port is not None:
                     portCandidates[port.uuid] = port
                     mappedEx.target = port
                 else:
@@ -243,45 +253,46 @@ def _(
                     newPort = __createCompoentPort(x, targetCollection)
                     portCandidates[newPort.uuid] = newPort
                     mappedEx.target = newPort
-
+                    mapping[(x._model.uuid, x.uuid)] = (newPort, False)
+            else:
+                portCandidates[mappedEx.target.uuid] = mappedEx.target
     if postpone:
         return False
 
     if len(portCandidates.items()) > 1:
         # potential intersected set case, go fault
         LOGGER.fatal(
-            f"[{process.__qualname__}] Several port candidates detected, cannot proceed with merge. Component port name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]: [%s]",
+            f"[{process.__qualname__}] Several port candidates detected, cannot proceed with merge. Function Port name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
             x.name,
             x.uuid,
             destParent.name,
             destParent.uuid,
             x._model.name,
             x._model.uuid,
-            portCandidates
+            extra={"ports": portCandidates}
         )
         exit(str(ExitCodes.MergeFault))
-
     if len(portCandidates.items()) == 1:
         port = list(portCandidates.values()).pop()
         mappedPort = mapping.get((port._model.uuid, port.uuid))
         if not mappedPort:
-            # coming here means that component was directly added into the model, not taken from the library
-            LOGGER.error(
-                f"[{process.__qualname__}] Non-library component port detected. Component port name [%s], uuid [%s], target port name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
+            # coming here means that function was directly added into the model, not taken from the library
+            LOGGER.debug(
+                f"[{process.__qualname__}] Adding Function Port into model name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
                 x.name,
                 x.uuid,
-                port.name,
-                port.uuid,
                 destParent.name,
                 destParent.uuid,
                 x._model.name,
                 x._model.uuid,
             )
-            mapping[(x._model.uuid, x.uuid)] = (port, False)
-            mapping[(port._model.uuid, port.uuid)] = (port, False)
+
+        mapping[(x._model.uuid, x.uuid)] = (port, False)
     else:
         # port without exchanges
-        newPort = __createCompoentPort(x, targetCollection)
-        mapping[(x._model.uuid, x.uuid)] = (newPort, False)
+        port = __findMatchingPort(x, targetCollection, destParent)
+        if port is None:
+            port = __createCompoentPort(x, targetCollection)
+        mapping[(x._model.uuid, x.uuid)] = (port, False)
 
     return True

@@ -1,5 +1,4 @@
 from collections import deque
-import stat
 from venv import logger
 
 from arcadiaMergeTool import getLogger
@@ -34,9 +33,7 @@ def _makeModelElementList(
     lst = deque(
         filter(
             lambda x: not isinstance(x, re.CatalogElement)
-            and not isinstance(x, re.CatalogElementLink)
             and not isinstance(x, re.RecCatalog)
-            and not isinstance(x, mm.capellacommon.TransfoLink)
             and not isinstance(x, li.LibraryReference)
             and not isinstance(x, li.ModelInformation),
             model.model.search(ModelElement, below=model.model.project),

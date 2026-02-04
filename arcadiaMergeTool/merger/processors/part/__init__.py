@@ -98,7 +98,7 @@ def _(
         return True
 
     modelParent = x.parent
-    if (not doProcess(modelParent, dest, src, base, mapping) # pyright: ignore[reportArgumentType] expect modelParent is of tyoe ModelElement
+    if (not doProcess(modelParent, dest, src, base, mapping) # pyright: ignore[reportArgumentType] expect modelParent is of type ModelElement
         or not doProcess(x.type, dest, src, base, mapping) # pyright: ignore[reportArgumentType] expect x.type is valid property
     ):
         # part is merely a link to a component, check if component can be referenced

@@ -28,8 +28,6 @@ class CapellaMergeModel:
 
         modelRefs: dict[str, Any] = {'revision': model.gitModelAttrib} if model.gitModelAttrib is not None else {}
 
-        print ("!!!", path, config.basePath)
-        print(resources)
         self.model = capellambse.MelodyModel(path=path, resources=resources, **modelRefs)
 
     def save(self):

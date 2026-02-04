@@ -1,15 +1,12 @@
-import capellambse
-import capellambse.model as m
+import capellambse.metamodel as mm
 
 from arcadiaMergeTool.helpers import ExitCodes
 import capellambse.metamodel.re as re
-import capellambse.metamodel.capellamodeller
 
 from arcadiaMergeTool import getLogger
 from arcadiaMergeTool.helpers.constants import REC_CATALOG_NAME
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
-from capellambse.model import ModelElement
 
 LOGGER = getLogger(__name__)
 
@@ -65,8 +62,9 @@ def mergeExtensions(
         * key - origin link id
         * value - link
     """
+    prj: mm.capellamodeller.Project = dest.model.project
 
-    for ext in dest.model.project.model_root.extensions:
+    for ext in prj.model_root.extensions:
         if isinstance(ext, re.RecCatalog):
             LOGGER.debug(
                 f"[{mergeExtensions.__qualname__}] Cache: REC Catalog [%s] found in target model, record contents",
@@ -79,6 +77,8 @@ def mergeExtensions(
 
             for elem in ext.elements:
                 if isinstance(elem, re.CatalogElement):
+                    elementsMappingMap[(elem._model.uuid, elem.uuid)] = (elem, True)
+
                     if elem.kind == re.CatalogElementKind.RPL:
                         LOGGER.debug(
                             f"[{mergeExtensions.__qualname__}] Cache: catalog with uuid [%s]",
@@ -146,8 +146,9 @@ def mergeExtensions(
             model.model.name,
             model.model.uuid,
         )
-
-        extensions = model.model.project.model_root.extensions
+    
+        prj: mm.capellamodeller.Project = model.model.project
+        extensions = prj.model_root.extensions
         for ext in extensions:
             if isinstance(ext, re.RecCatalog):
                 LOGGER.debug(
@@ -176,7 +177,7 @@ def mergeExtensions(
 
                             # refer to origin uuid, as long as it points to the stable ID in the source library
                             source = elem.origin
-                            if source and source.uuid:
+                            if source is not None and source.uuid:
                                 # if no RPL recorded in target extensions, create one
                                 targetElem = destExtensionsMap.get(source.uuid)
                                 if targetElem is None:
@@ -199,6 +200,9 @@ def mergeExtensions(
                                             origin=origin,
                                             suffix=elem.suffix,
                                         )
+
+                                        elementsMappingMap[(elem._model.uuid, elem.uuid)] = (element, True)
+
                                         destExtensionsMap[source.uuid] = element
                                         LOGGER.debug(
                                             f"[{mergeExtensions.__qualname__}] Merge: created new extension element [%s] with uuid [%s], origin [%s] with uuid [%s]",
@@ -214,6 +218,7 @@ def mergeExtensions(
                                         )
                                         exit(str(ExitCodes.MergeFault))
                                 else:
+                                    elementsMappingMap[(elem._model.uuid, elem.uuid)] = (targetElem, True)
                                     # TODO: implement sanity check to ensure replicas consistency across the models
                                     isSane = True
                                     # isSane = (targetElem.name == elem.name
@@ -242,45 +247,6 @@ def mergeExtensions(
                                     source.uuid
                                 ]
 
-                                for link in elem.links:
-                                    LOGGER.debug(
-                                        f"[{mergeExtensions.__qualname__}] Merge: Processing catalog element link [%s], model [%s], uuid [%s]",
-                                        link.uuid,
-                                        link._model.name,
-                                        link._model.uuid,
-                                    )
-
-                                    # assume all missing cache does not really exists and it's safe to add more links
-                                    if catalogEntry.get(link.origin.uuid) is None:  # pyright: ignore[reportOptionalMemberAccess] expect origin must be there, model parsing fails on missing origin
-                                        # source = _model.by_uuid(str(link.source.uuid))
-                                        # take catalogElement as granted, assume no links can point outside catalog
-                                        source = catalogElement
-
-                                        # target elements must be re-constructed by copying relevant properties and elements inside target model
-                                        # this adds certain degree of confidence that resulting model contains correctly copied elements
-                                        # target = _model.by_uuid(str(link.target.uuid))
-                                        target = mergeRplElement(
-                                            link.target,  # pyright: ignore[reportArgumentType, reportOptionalMemberAccess] expect target already exists in the model
-                                            link.origin,  # pyright: ignore[reportArgumentType, reportOptionalMemberAccess] expect target already exists in the model
-                                            dest,
-                                            base,
-                                            elementsMappingMap,
-                                        )
-                                        origin = _model.by_uuid(str(link.origin.uuid))  # pyright: ignore[reportOptionalMemberAccess] expect origin exists
-                                        newLink = catalogElement.links.create(
-                                            "CatalogElementLink",
-                                            source=source,
-                                            origin=origin,
-                                            target=target,
-                                        )
-                                        catalogEntry[origin.uuid] = newLink
-                                    else:
-                                        elementsMappingMap[
-                                            (link.target._model.uuid, link.target.uuid) # pyright: ignore[reportOptionalMemberAccess] expect target already exists in the model
-                                        ] = elementsMappingMap[
-                                            (link.origin.source.uuid, link.origin.uuid) # pyright: ignore[reportOptionalMemberAccess] expect origin already exists in the model
-                                        ]
-
                             else:
                                 LOGGER.warning(
                                     f"[{mergeExtensions.__qualname__}] Merge: unknown catalog element [%s] does not have origin",
@@ -303,145 +269,3 @@ def mergeExtensions(
                     f"[{mergeExtensions.__qualname__}] Merge: unknown extension [%s] detacted in source model [%s]",
                     ext.name.model.model.name,
                 )
-
-        # exit(1)
-
-
-def mergeRplElement(
-    sourceElement: ModelElement,
-    origin: re.CatalogElementLink,
-    dest: CapellaMergeModel,
-    base: CapellaMergeModel,
-    elementsMappingMap: MergerElementMappingMap,
-) -> ModelElement:
-    """Starting point for recursive merge of the model elements
-
-    Parameters
-    ==========
-
-    sourceElement:
-        element of source model to merge into the target model
-    origin:
-        link to a library to check element against
-    dest:
-        destination model to merge element into
-    base:
-        base library to check all elements against
-    elementsMappingMap
-        global cache of mapped elements
-    return:
-        element created in destination model
-
-    Description
-    ===========
-
-    From this point start recursive merge of every element into destination model
-    """
-
-    # create key for cache matches
-    cacheKey = (sourceElement._model.uuid, sourceElement.uuid)
-    cacheOriginKey = (origin.source.uuid, origin.uuid) # pyright: ignore[reportOptionalMemberAccess] expect origin already exists in the model
-
-    if elementsMappingMap.get(cacheKey) is not None:
-        # immediate cached match, at the moment there's no need for a deep merge
-        elementsMappingMap[cacheOriginKey] = elementsMappingMap[cacheKey]
-        return elementsMappingMap[cacheKey][0]
-    elif elementsMappingMap.get(cacheOriginKey) is not None:
-        # immediate cached match, at the moment there's no need for a deep merge
-        elementsMappingMap[cacheKey] = elementsMappingMap[cacheOriginKey]
-        return elementsMappingMap[cacheOriginKey][0]
-
-    # first level of elements will be brought right to their direct parents counterparts
-    # in destination model, all others will be delivered based on the components internal structure
-    prj: capellambse.metamodel.capellamodeller.Project = dest.model.project
-
-    # use nearest match by name, it is more or less safe in case of the replicas, usually nobody takes care to rename imported elements
-    nearestMatch = list(
-        filter(
-            lambda x: x.name == sourceElement.name
-            and x.parent.name == sourceElement.parent.name,  # pyright: ignore[reportAttributeAccessIssue] name is a legal attribute in this context
-            dest.model.search(sourceElement.__class__, below=prj.model_root),
-        )
-    )
-
-    if len(nearestMatch) == 0:
-        LOGGER.debug(
-            f"[{mergeRplElement.__qualname__}] no matching element found for [%s] uuid [%s] class [%s], append to the model",
-            sourceElement.name,
-            sourceElement.uuid,
-            sourceElement.__class__,
-        )
-
-        # assume it's safe to search for the nearest match by class and find only one root using two step lookup - by layer and then by parent
-        nearestDestLayer = dest.model.search(
-            sourceElement.layer.__class__, below=prj.model_root
-        ).pop()
-        nearestDestParents = dest.model.search(
-            sourceElement.parent.__class__, below=nearestDestLayer
-        )
-        nearestDestParent = None
-        if len(nearestDestParents) == 1:
-            nearestDestParent = nearestDestParents.pop()
-        elif len(nearestDestParents) > 1:
-            nearestDestParent = list(
-                filter(
-                    lambda x: x.name == sourceElement.parent.name  # pyright: ignore[reportAttributeAccessIssue] name is a legal attribute in this context
-                    and x.parent.name == sourceElement.parent.parent.name,  # pyright: ignore[reportAttributeAccessIssue] name is a legal attribute in this context
-                    nearestDestParents,
-                )
-            ).pop()
-        else:
-            LOGGER.fatal(
-                f"[{mergeRplElement.__qualname__}] impossible case, no nearest parent found for [%s] uuid [%s] class [%s], append to the model",
-                sourceElement.name,
-                sourceElement.uuid,
-                sourceElement.__class__,
-            )
-            exit(str(ExitCodes.MergeFault))
-
-        # note limited use of low level api, it must be used to create immediate structure in simplest possible way
-        # for everything else higher level api must be used with appropriate mapping mathods
-        lowLevelParent = nearestDestParent._element
-        lowLevelSourceElement = sourceElement._element
-        with dest.model._loader.new_uuid(lowLevelParent) as uuid:
-            attrib = lowLevelSourceElement.attrib
-            lowLevelDestElement = lowLevelParent.makeelement(
-                lowLevelSourceElement.tag,
-                attrib=attrib,
-                nsmap=lowLevelSourceElement.nsmap,
-            )
-            lowLevelDestElement.set("id", uuid)
-            lowLevelParent.append(lowLevelDestElement)
-            dest.model._loader.idcache_index(lowLevelDestElement)
-
-            # HACK: due to low level model deficiency, following attributes must be recursively processed, otherwise model renders broken due to wrong ids supplied
-            if attrib.get("source") is not None:
-                sel = sourceElement.source
-                rel = mergeRplElement(sel, origin, dest, base, elementsMappingMap)
-                lowLevelDestElement.set("source", f"#{rel.uuid}")
-            if attrib.get("target") is not None:
-                sel = sourceElement.target
-                rel = mergeRplElement(sel, origin, dest, base, elementsMappingMap)
-                lowLevelDestElement.set("target", f"#{rel.uuid}")
-            if attrib.get("abstractType"):
-                sel = sourceElement.type
-                rel = mergeRplElement(sel, origin, dest, base, elementsMappingMap)
-                lowLevelDestElement.set("abstractType", f"#{rel.uuid}")
-
-        destElement = m.wrap_xml(dest.model, lowLevelDestElement)
-
-        elementsMappingMap[cacheKey] = (destElement, True)
-        elementsMappingMap[cacheOriginKey] = (destElement, True)
-        return destElement
-    else:
-        destElement = nearestMatch.pop()
-        LOGGER.debug(
-            f"[{mergeRplElement.__qualname__}] nearest matching element found in target model [%s] uuid [%s] class [%s]; total elements found [%s]",
-            sourceElement.name,
-            sourceElement.uuid,
-            sourceElement.__class__,
-            len(nearestMatch),
-        )
-        elementsMappingMap[cacheKey] = (destElement, True)
-        elementsMappingMap[cacheOriginKey] = (destElement, True)
-        return destElement

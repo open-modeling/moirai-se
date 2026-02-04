@@ -1,4 +1,6 @@
 import capellambse.metamodel as mm
+from capellambse.metamodel import re
+import capellambse.model as m
 from capellambse import helpers
 
 from arcadiaMergeTool.helpers import ExitCodes
@@ -6,37 +8,31 @@ from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
 
-import capellambse.model as m
 from arcadiaMergeTool.merger.processors._processor import clone, process, doProcess, recordMatch
 
 LOGGER = getLogger(__name__)
 
-T = mm.sa.MissionInvolvement
+T =  re.CatalogElementLink
 
 @clone.register
 def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
+
+    src = mapping[(x._model.uuid, x.source.uuid)] # pyright: ignore[reportOptionalMemberAccess] expect spurce is already there
+    tgt = mapping[(x._model.uuid, x.target.uuid)] # pyright: ignore[reportOptionalMemberAccess] expect target is already there
+
     newComp = coll.create(helpers.xtype_of(x._element),
-        involved = mapping.get((x._model.uuid, x.involved.uuid))[0], # pyright: ignore[reportOptionalMemberAccess, reportOptionalSubscript] expect target is already there
-        description = x.description,
-        is_visible_in_doc = x.is_visible_in_doc,
-        is_visible_in_lm = x.is_visible_in_lm,
-        review = x.review,
+        is_suffixed = x.is_suffixed,
         sid = x.sid,
-        summary = x.summary,
+        source = src[0],
+        target = tgt[0],
+        unsynchronized_features = x.unsynchronized_features,
     ) 
 
-    # TODO: fix PVMT
-    # .applied_property_value_groups = []
-    # .applied_property_values = []
-    # .property_value_groups = []
-    # .property_values = []
-    # .pvmt = 
-
-    if x.status is not None:
-        newComp.status = x.status
-
+    if x.origin is not None:
+        newComp.origin = coll._model.by_uuid(x.origin.uuid)
 
     return newComp
+
 
 @process.register
 def _(
@@ -46,18 +42,18 @@ def _(
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ) -> bool:
-    """Find and merge Mission Involvement
+    """Find and merge Catalog Element Link
 
     Parameters
     ==========
     x:
-        Mission Involvement to process
+        Catalog Element Link to process
     dest:
-        Destination model to add Mission Involvement to
+        Destination model to add Catalog Element Link to
     src:
-        Source model to take Mission Involvement from
+        Source model to take Catalog Element Link from
     base:
-        Base model to check Mission Involvement against
+        Base model to check Catalog Element Link against
     mapping:
         Full mapping of the elements to the corresponding models
 
@@ -69,7 +65,9 @@ def _(
         return True
 
     modelParent = x.parent
-    if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of type ModelElement
+    if (not doProcess(modelParent, dest, src, base, mapping) # pyright: ignore[reportArgumentType] expect modelParent is of type ModelElement
+        or (x.target is not None and not doProcess(x.target, dest, src, base, mapping))
+    ):
         # safeguard for direct call
         return False
 
@@ -90,12 +88,13 @@ def _(
 
     targetCollection = None
 
-    if (isinstance(destParent, mm.sa.Mission)
+    if (isinstance(destParent, re.CatalogElement)
     ):
-        targetCollection = destParent.involvements
+        targetCollection = destParent.links
     else:
         LOGGER.fatal(
-            f"[{process.__qualname__}] Mission Involvement parent is not a valid parent, Mission Involvement uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+            f"[{process.__qualname__}] Catalog Element Link parent is not a valid parent, Catalog Element Link name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+            x.name,
             x.uuid,
             x.__class__,
             destParent.name,
@@ -106,12 +105,8 @@ def _(
         )
         exit(str(ExitCodes.MergeFault))
 
-    mappedSource = mapping.get((x._model.uuid, x.parent.uuid))  # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-    mappedTarget = mapping.get((x._model.uuid, x.involved.uuid)) # pyright: ignore[reportOptionalMemberAccess, reportOptionalSubscript] expect target is already there
-    if mappedSource is None or mappedTarget is None:
-        # if source or target is not mapped, postpone allocation processing
-        return False
-    
-    matchList = list(filter(lambda y: y.parent == mappedSource[0] and x.involved == mappedTarget[0], targetCollection)) # pyright: ignore[reportOptionalSubscript] check for none is above, mappedSource and mappedTarget are safe
+    # use weak match by name
+    # TODO: implement strong match by PVMT properties
+    matchList = list(filter(lambda y: y.origin is not None and y.origin.uuid == x.origin.uuid or y.target.uuid == x.target.uuid, targetCollection)) # pyright: ignore[reportOptionalMemberAccess] expect origin is already there
 
     return recordMatch(matchList, x, destParent, targetCollection, mapping)

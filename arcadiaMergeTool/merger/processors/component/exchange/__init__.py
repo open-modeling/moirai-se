@@ -1,11 +1,11 @@
+import re
 import capellambse.metamodel as mm
 import capellambse.model as m
 from capellambse import helpers
-from capellambse.model import ModelElement
 
 from arcadiaMergeTool.helpers import ExitCodes
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
-from arcadiaMergeTool.helpers.types import MergerElementMappingEntry, MergerElementMappingMap
+from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
 
 from arcadiaMergeTool.merger.processors._processor import process, doProcess
@@ -19,10 +19,12 @@ __all__ = [
 
 LOGGER = getLogger(__name__)
 
-def __findMatchingExchange(targetCollection, srcExch, 
-                           mappedSourcFuncEntry: MergerElementMappingEntry | None, 
-                           mappedTargetFuncEntry: MergerElementMappingEntry | None, 
-                           mapping: MergerElementMappingMap) -> ModelElement | bool:
+T = mm.fa.ComponentExchange
+
+def __findMatchingExchange(targetCollection: m.ElementList[T], srcExch: T, 
+                           mappedSourcFuncEntry: m.ModelElement, 
+                           mappedTargetFuncEntry: m.ModelElement, 
+                           mapping: MergerElementMappingMap) -> T | bool:
     """Find Comp basen on exchange props
     
     Parameters
@@ -37,14 +39,13 @@ def __findMatchingExchange(targetCollection, srcExch,
     Matching Comp or None
     """
     srcExchMapping = mapping.get((srcExch._model.uuid, srcExch.uuid))
-    srcExchMappedExch = srcExchMapping[0] if srcExchMapping is not None else None
+    srcExchMappedExch: T | None = srcExchMapping[0] if srcExchMapping is not None else None # pyright: ignore[reportAssignmentType] expect collection type matches T
 
     if srcExchMappedExch is not None:
         # for already mapped exchanges no need no do something
         return srcExchMappedExch
 
     for tgtExch in targetCollection:
-
         # NOTE: weak match against exchange name
         # TODO: replace weak match with PVMT based strong match
         if tgtExch.name == srcExch.name:
@@ -52,17 +53,14 @@ def __findMatchingExchange(targetCollection, srcExch,
             # 1. there might be several exchanges with the same name
             # 2. exchange is mapped before Comp and may have empty source and target
 
-            if tgtExch.source is None or tgtExch.target is None:
+            if tgtExch.source is None and tgtExch.target is None:
                 # when one of ports is not mapped, don't create twins in same collection
                 # otherwise it will not be possible to distict one exchange from another
                 # we might be facing potentinal twin exchange, but need to postpone processing
                 # True means that exchange processing must be postponed
                 return True
 
-            tgtExchMappedSourceFunc = mapping.get((tgtExch._model.uuid, tgtExch.source.parent.uuid))
-            tgtExchMappedTargetFunc = mapping.get((tgtExch._model.uuid, tgtExch.target.parent.uuid))
-
-            if tgtExchMappedSourceFunc is not None and tgtExchMappedTargetFunc is not None and tgtExchMappedSourceFunc == mappedSourcFuncEntry and tgtExchMappedTargetFunc == mappedTargetFuncEntry:
+            if (tgtExch.source is not None and tgtExch.source.parent == mappedSourcFuncEntry) and (tgtExch.target is not None and tgtExch.target.parent == mappedTargetFuncEntry):
                 # if name, source function and target function are equal, map existing exchange to a candidate
                 return tgtExch
 
@@ -71,7 +69,7 @@ def __findMatchingExchange(targetCollection, srcExch,
 
 @process.register
 def _(
-    x: mm.fa.ComponentExchange,
+    x: T,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
@@ -96,11 +94,12 @@ def _(
     =======
     True if element was completely processed, False otherwise
     """
+
     if mapping.get((x._model.uuid, x.uuid)) is not None:
         return True
 
     modelParent = x.parent
-    if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of tyoe ModelElement
+    if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of type ModelElement
         # safeguard for direct call
         return False
 
@@ -153,18 +152,15 @@ def _(
     #  - Components exist - legitimate case, updates mapping
     # 
     # In both cases - iterate through the exchanges and match them by name
-
-    doProcess(x.source, dest, src, base, mapping)
-    doProcess(x.target, dest, src, base, mapping)
-
-    sourceComponentMap = mapping.get((x.source.parent._model.uuid, x.source.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect source exists in this context
-    targetComponentMap = mapping.get((x.target.parent._model.uuid, x.target.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect target exists in this context
+    
+    sourceComponentMap = mapping.get((x._model.uuid, x.source.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect source exists in this context
+    targetComponentMap = mapping.get((x._model.uuid, x.target.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect target exists in this context
 
     if sourceComponentMap is None or targetComponentMap is None:
         # Fast fail, postpone exchange processing to component existence
         return False
 
-    ex = __findMatchingExchange(targetCollection, x, sourceComponentMap, targetComponentMap, mapping)
+    ex = __findMatchingExchange(targetCollection, x, sourceComponentMap[0], targetComponentMap[0], mapping)
 
     if ex is True:
         # postpone exececution on boolean true
@@ -214,19 +210,15 @@ def _(
             summary = x.summary,
         ) 
 
-        # TODO: fix PVMT
-        # .property_value_groups = []
-        # .property_values = []
-        # .pvmt = 
-
         if x.status is not None:
             newComp.status = x.status
             
-        # NOTE: do not assign ports, port assignment logic is in function/port
-        # if sourceComponentPortMap is not None:
-        #     newComp.source = sourceComponentPortMap # pyright: ignore[reportAttributeAccessIssue] expect source exists on model
-        # if targetComponentPortMap is not None:
-        #     newComp.target = targetComponentPortMap # pyright: ignore[reportAttributeAccessIssue] expect source exists on model
+        sourceComponentPortMap = mapping.get((x._model.uuid, x.source.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect exchange has source
+        targetComponentPortMap = mapping.get((x._model.uuid, x.target.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect exchange has target
+        if sourceComponentPortMap is not None:
+            newComp.source = sourceComponentPortMap[0] # pyright: ignore[reportAttributeAccessIssue] expect source exists on model
+        if targetComponentPortMap is not None:
+            newComp.target = targetComponentPortMap[0] # pyright: ignore[reportAttributeAccessIssue] expect source exists on model
 
         mapping[(x._model.uuid, x.uuid)] = (newComp, False)
 

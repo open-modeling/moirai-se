@@ -11,7 +11,11 @@ from arcadiaMergeTool.merger.processors._processor import process, doProcess
 
 LOGGER = getLogger(__name__)
 
-def __findMatchingPort(targetCollection, srcExch, destParent, source: bool)-> mm.fa.FunctionPort | None:
+T = mm.fa.FunctionPort
+U = mm.fa.FunctionalExchange
+V = mm.fa.AbstractFunction
+
+def __findMatchingPort(x: T, targetCollection: m.ElementList[T], destParent: V, srcExch: U | None = None)-> T | None:
     """Find port based on exchange props
     
     Parameters
@@ -25,14 +29,19 @@ def __findMatchingPort(targetCollection, srcExch, destParent, source: bool)-> mm
     =======
     Matching port or None
     """
-    for port in targetCollection:
-        for ex in port.exchanges:
-            # NOTE: weak match against exchange name
-            # TODO: replace weak match with PVMT based strong match
-            if ex.name == srcExch.name and port.parent == destParent and ((source and ex.source is None) or (not source and ex.target is None)) :
+    if srcExch is None:
+        for port in targetCollection:
+            if len(port.exchanges) == 0 and port.name == x.name:
                 return port
+    else:
+        for port in targetCollection:
+            for ex in port.exchanges:
+                # NOTE: weak match against exchange name
+                # TODO: replace weak match with PVMT based strong match
+                if ex.name == srcExch.name and port.parent == destParent and x.orientation == port.orientation:
+                    return port
 
-def __createCompoentPort(x: mm.fa.FunctionPort, targetCollection: m._obj.ElementList) -> mm.fa.FunctionPort:
+def __createCompoentPort(x: T, targetCollection: m._obj.ElementList) -> T:
     """Create port in model
 
     Parameters
@@ -85,7 +94,7 @@ def __createCompoentPort(x: mm.fa.FunctionPort, targetCollection: m._obj.Element
 
 @process.register
 def _(
-    x: mm.fa.FunctionPort,
+    x: T,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
@@ -114,7 +123,7 @@ def _(
         return True
 
     modelParent = x.parent
-    if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of tyoe ModelElement
+    if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of type ModelElement
         # safeguard for direct call
         return False
 
@@ -204,7 +213,7 @@ def _(
             # but keep returning to proceed with updated exchanges
             postpone = True
             continue
-            
+
         mappedEx = exMap[0]
         if ex.source == x:
             # when exchange is landed from source model it does not have port mapped
@@ -212,7 +221,7 @@ def _(
             if mappedEx.source is None:
                 # potential superset case - exchange exists, but not mapped
                 # find first matching port with exchange sharing same properties
-                port= __findMatchingPort(targetCollection, ex, destParent, True)
+                port= __findMatchingPort(x, targetCollection, destParent, ex) # pyright: ignore[reportArgumentType] expect targetCollection contains rights elements
                 if port is not None:
                     portCandidates[port.uuid] = port
                     mappedEx.source = port
@@ -221,13 +230,16 @@ def _(
                     newPort = __createCompoentPort(x, targetCollection)
                     portCandidates[newPort.uuid] = newPort
                     mappedEx.source = newPort
+                    mapping[(x._model.uuid, x.uuid)] = (newPort, False)
+            else:
+                portCandidates[mappedEx.source.uuid] = mappedEx.source
         elif ex.target == x:
             # when exchange is landed from source model it does not have port mapped
             # port mapping performed here to avoid recursive model processing
             if mappedEx.target is None:
                 # potential superset case - exchange exists, but not mapped
                 # find first matching port with exchange sharing same properties
-                port = __findMatchingPort(targetCollection, ex, destParent, False)
+                port= __findMatchingPort(x, targetCollection, destParent, ex) # pyright: ignore[reportArgumentType] expect targetCollection contains rights elements
                 if port is not None:
                     portCandidates[port.uuid] = port
                     mappedEx.target = port
@@ -236,6 +248,9 @@ def _(
                     newPort = __createCompoentPort(x, targetCollection)
                     portCandidates[newPort.uuid] = newPort
                     mappedEx.target = newPort
+                    mapping[(x._model.uuid, x.uuid)] = (newPort, False)
+            else:
+                portCandidates[mappedEx.target.uuid] = mappedEx.target
     if postpone:
         return False
 
@@ -252,7 +267,6 @@ def _(
             extra={"ports": portCandidates}
         )
         exit(str(ExitCodes.MergeFault))
-
     if len(portCandidates.items()) == 1:
         port = list(portCandidates.values()).pop()
         mappedPort = mapping.get((port._model.uuid, port.uuid))
@@ -267,12 +281,13 @@ def _(
                 x._model.name,
                 x._model.uuid,
             )
-            mapping[(x._model.uuid, x.uuid)] = (port, False)
-            mapping[(port._model.uuid, port.uuid)] = (port, False)
+
+        mapping[(x._model.uuid, x.uuid)] = (port, False)
     else:
         # port without exchanges
-        newPort = __createCompoentPort(x, targetCollection)
-        mapping[(newPort._model.uuid, newPort.uuid)] = (newPort, False)
-        mapping[(x._model.uuid, x.uuid)] = (newPort, False)
+        port = __findMatchingPort(x, targetCollection, destParent) # pyright: ignore[reportArgumentType] expect target collection has correct elements
+        if port is None:
+            port = __createCompoentPort(x, targetCollection)
+        mapping[(x._model.uuid, x.uuid)] = (port, False)
 
     return True

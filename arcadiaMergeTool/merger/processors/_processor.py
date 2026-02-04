@@ -1,4 +1,5 @@
 from functools import singledispatch
+import re
 from typing import Callable
 import capellambse.metamodel as mm
 import capellambse.model as m
@@ -166,7 +167,6 @@ def doProcess (
         # PREPROCESSORS END
         #######################################
 
-
         if not process(x, dest, src, base, mapping):
             return False
 
@@ -196,10 +196,10 @@ def doProcess (
                         mappedXEl.__class__,
                     )
 
-            if isinstance(mappedXEl, mc.AbstractTypedElement) and x.type is not None:
-                # HACK: add post-processors
-                mappedXElType = mapping[(x.type._model.uuid, x.type.uuid)][0] 
-                mappedXEl.type = mappedXElType
+            # if isinstance(mappedXEl, mc.AbstractTypedElement) and x.type is not None:
+            #     # HACK: add post-processors
+            #     mappedXElType = mapping[(x.type._model.uuid, x.type.uuid)][0] 
+            #     mappedXEl.type = mappedXElType
 
             if (isinstance(mappedXEl, cc.CapellaElement)):
 

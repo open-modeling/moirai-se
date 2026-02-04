@@ -44,7 +44,7 @@ def _(
         return True
 
     modelParent = x.parent
-    if (not doProcess(modelParent, dest, src, base, mapping) # pyright: ignore[reportArgumentType] expect modelParent is of tyoe ModelElement
+    if (not doProcess(modelParent, dest, src, base, mapping) # pyright: ignore[reportArgumentType] expect modelParent is of type ModelElement
         or not doProcess(x.property, dest, src, base, mapping) # pyright: ignore[reportArgumentType] expect property is there
     ):
         # safeguard for direct call

@@ -48,10 +48,6 @@ def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap): # pyright
 
     if x.status is not None: # pyright: ignore[reportAttributeAccessIssue] expect status is valid attribute
         newComp.status = x.status # pyright: ignore[reportAttributeAccessIssue] expect status is valid attribute
-        
-    if not isinstance(newComp, mm.la.LogicalComponent):
-        newComp.kind = x.kind
-        newComp.nature = x.nature
 
     return newComp
 
@@ -86,7 +82,7 @@ def _(
         return True
 
     modelParent = x.parent # pyright: ignore[reportAttributeAccessIssue] expect parent is there
-    if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of tyoe ModelElement
+    if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of type ModelElement
         # safeguard for direct call
         return False
 
