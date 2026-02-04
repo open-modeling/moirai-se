@@ -1,17 +1,16 @@
 from functools import singledispatch
-import re
 from typing import Callable
-import capellambse.metamodel as mm
-import capellambse.model as m
 
-from arcadiaMergeTool.helpers import ExitCodes
-from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
-from capellambse.model import ModelElement
-import capellambse.metamodel.modellingcore as mc
+import capellambse.metamodel as mm
 import capellambse.metamodel.capellacore as cc
-from arcadiaMergeTool.helpers.types import MergerElementMappingMap
+import capellambse.metamodel.modellingcore as mc
+import capellambse.model as m
+from capellambse.model import ModelElement
 
 from arcadiaMergeTool import getLogger
+from arcadiaMergeTool.helpers import ExitCodes
+from arcadiaMergeTool.helpers.types import MergerElementMappingMap
+from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
 LOGGER = getLogger(__name__)
 

@@ -1,14 +1,19 @@
+import sys
 
 import capellambse.metamodel as mm
+import capellambse.model as m
 from capellambse import helpers
 
-from arcadiaMergeTool.helpers import ExitCodes
-from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
-from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
-
-import capellambse.model as m
-from arcadiaMergeTool.merger.processors._processor import clone, process, doProcess, recordMatch
+from arcadiaMergeTool.helpers import ExitCodes
+from arcadiaMergeTool.helpers.types import MergerElementMappingMap
+from arcadiaMergeTool.merger.processors._processor import (
+    clone,
+    doProcess,
+    process,
+    recordMatch,
+)
+from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
 from . import deployment
 
@@ -42,24 +47,7 @@ def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
         sid = x.sid,
         summary = x.summary,
         visibility = x.visibility,
-    ) 
-
-    # TODO: track PVMT
-    # .applied_property_value_groups = []
-    # .applied_property_values = []
-    # .property_value_groups = []
-    # .property_values = []
-
-    # TODO: check how to copy these values
-    # newComp.default_value = x.default_value
-    # newComp.max_card = x.max_card
-    # newComp.max_length = x.max_length
-    # newComp.max_value = x.max_value
-    # newComp.min_card = x.min_card
-    # newComp.min_length = x.min_length
-    # newComp.min_value = x.min_value
-    # newComp.null_value = x.null_value
-    # newComp.owned_type = x.owned_type
+    )
 
     if x.status is not None:
         newComp.status = x.status  # pyright: ignore[reportAttributeAccessIssue] assume status is already there
@@ -75,10 +63,10 @@ def _(
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ) -> bool:
-    """Find and merge Parts
+    """Find and merge Parts.
 
     Parameters
-    ==========
+    ----------
     x:
         Part to process
     dest:
@@ -91,7 +79,7 @@ def _(
         Full mapping of the elements to the corresponding models
 
     Returns
-    =======
+    -------
     True if element was completely processed, False otherwise
     """
     if mapping.get((x._model.uuid, x.uuid)) is not None:
@@ -117,29 +105,26 @@ def _(
             x._model.name,
             x._model.uuid,
         )
-        exit(str(ExitCodes.MergeFault))
+        sys.exit(str(ExitCodes.MergeFault))
 
-    (destParent, fromLibrary) = destParentEntry
+    (destParent, _fromLibrary) = destParentEntry
 
     targetCollection = None
 
-    if (isinstance(destParent, mm.sa.SystemComponentPkg) 
-        or isinstance(destParent, mm.la.LogicalComponentPkg)
-        or isinstance(destParent, mm.pa.PhysicalComponentPkg)
+    if (isinstance(destParent, (mm.sa.SystemComponentPkg, mm.la.LogicalComponentPkg, mm.pa.PhysicalComponentPkg))
         ) and destParent.parts[0] == x:
         # HACK: assume System is a very first root part
         # map system to system and assume it's done
         mapping[(x._model.uuid, x.uuid)] = (destParent.parts[0], False)
         return True
-    elif isinstance(destParent, mm.epbs.ConfigurationItemPkg) and destParent.configuration_items[0] == x:
+
+    if isinstance(destParent, mm.epbs.ConfigurationItemPkg) and destParent.configuration_items[0] == x:
         # HACK: assume System is a very first root configuratiobn item
         # map system to system and assume it's done
         mapping[(x._model.uuid, x.uuid)] = (destParent.configuration_items[0], False)
         return True
-    elif (isinstance(destParent, mm.cs.Component)
-        or isinstance(destParent, mm.pa.PhysicalComponentPkg)
-        or isinstance(destParent, mm.sa.SystemComponentPkg)
-        or isinstance(destParent, mm.la.LogicalComponentPkg)
+
+    if (isinstance(destParent, (mm.cs.Component, mm.pa.PhysicalComponentPkg, mm.sa.SystemComponentPkg, mm.la.LogicalComponentPkg))
     ):
         targetCollection = destParent.owned_parts # pyright: ignore[reportAttributeAccessIssue] expect owned_parts exists in this context
     elif isinstance(destParent, mm.epbs.ConfigurationItemPkg):
@@ -156,7 +141,7 @@ def _(
             x._model.name,
             x._model.uuid,
         )
-        exit(str(ExitCodes.MergeFault))
+        sys.exit(str(ExitCodes.MergeFault))
 
     # use weak match by name
     # TODO: implement strong match by PVMT properties

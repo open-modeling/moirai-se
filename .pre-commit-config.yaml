@@ -1,0 +1,91 @@
+# SPDX-FileCopyrightText: Copyright Julia Winedfox Lebedeva
+# SPDX-License-Identifier: EPL-2.0
+
+default_install_hook_types: [commit-msg, pre-commit]
+default_stages: [pre-commit, pre-merge-commit]
+minimum_pre_commit_version: 3.2.0
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-ast
+      - id: check-builtin-literals
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-shebang-scripts-are-executable
+      - id: check-symlinks
+      - id: check-toml
+      - id: check-vcs-permalinks
+      - id: check-xml
+      - id: check-yaml
+      - id: debug-statements
+      - id: destroyed-symlinks
+      - id: end-of-file-fixer
+      - id: fix-byte-order-marker
+      - id: trailing-whitespace
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.5.6
+    hooks:
+      - id: insert-license
+        name: Insert Apache license headers (shell-style comments)
+        files: '(?:^|/)(?:.*\.(?:pyi?|sh|toml|ya?ml)|Dockerfile|Makefile)$'
+        exclude: '(?:^|/)\..+|^docs/Makefile$'
+        args:
+          - --detect-license-in-X-top-lines=15
+          - --license-filepath
+          - LICENSE
+          - --comment-style
+          - "#"
+  - repo: local # docformatter
+    hooks:
+      - id: docformatter
+        name: docformatter
+        language: system
+        entry: uv run --dev docformatter --in-place
+        types_or: [python]
+        require_serial: true
+  - repo: local # ruff
+    hooks:
+      - id: ruff-format
+        name: Format with ruff
+        language: system
+        entry: uv run --dev ruff format
+        types_or: [python, pyi, jupyter]
+        require_serial: true
+      - id: ruff-check
+        name: Lint with ruff
+        language: system
+        entry: uv run --dev ruff check --output-format=concise
+        types_or: [python, pyi, jupyter]
+        args: [--extend-ignore=FIX, --fix]
+        require_serial: true
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.10
+    hooks:
+      - id: actionlint-docker
+  - repo: local # mypy
+    hooks:
+      - id: mypy
+        name: mypy
+        language: system
+        entry: uv run --dev --group test --group typecheck mypy src/capellambse tests
+        types_or: [python, pyi, toml, yaml]
+        require_serial: true
+        pass_filenames: false
+  - repo: local # reuse
+    hooks:
+      - id: reuse-lint-file
+        name: reuse lint-file
+        language: system
+        entry: uv run --dev reuse lint-file
+        require_serial: true
+  - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
+    rev: v9.23.0
+    hooks:
+      - id: commitlint
+        stages: [commit-msg]
+        additional_dependencies:
+          - "@commitlint/config-conventional"

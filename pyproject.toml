@@ -1,0 +1,266 @@
+# SPDX-FileCopyrightText: Copyright Julia Wingedfox Lebedeva
+# SPDX-License-Identifier: EPL 2.0
+
+[build-system]
+requires = [
+  "setuptools>=80.10.2",
+  "setuptools-rust",
+  "setuptools-scm[toml]>=9.2.2",
+  "wheel",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+dynamic = ["version"]
+
+name = "moirai-se"
+description = "Merge Capella Models"
+readme = "README.md"
+requires-python = ">=3.12, <3.15"
+license = "EPL-2.0"
+license-files = ["LICENSES"]
+authors = [{ name = "Julia Wingedfox Lebedeva" }]
+keywords = ["arcadia", "capella", "mbse", "model-based systems engineering"]
+classifiers = [
+  "Development Status :: 3 - Alfa",
+  "Intended Audience :: Developers",
+  "Natural Language :: English",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Other/Nonlisted Topic",
+  "Topic :: Scientific/Engineering",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed",
+]
+dependencies = [
+  "capellambse>=0.8",
+  "awesomeversion>=25.5.0",
+  "pyyaml>=6.0.2",
+  "requests>=2.32.4",
+  "typing-extensions >=4.9.0, <5",
+]
+
+[project.urls]
+Homepage = "https://github.com/open-modeling/moirai-se"
+Documentation = "https://github.com/open-modeling/moirai-se"
+
+[project.optional-dependencies]
+cli = []
+
+decl = []
+httpfiles = []
+
+png = []
+termgraphics = []
+
+[project.scripts]
+
+
+[dependency-groups]
+test = [
+  "coverage>=7.9.1",
+  "jinja2>=3.1.6",
+  "pytest>=9.0.2",
+  "pytest-xdist>=3.7.0",
+]
+
+dev = [
+  "capellambse>=0.8.1",
+  "docformatter[tomli]==1.7.7",
+  "mypy==1.19.1",
+  "pandas>=3.0.0",
+  "pre-commit==4.5.1",
+  "pylsp-mypy==0.7.0",
+  "pytest-cov>=7.0.0",
+  "python-lsp-server[rope]==1.14.0",
+  "reuse==6.2.0",
+  "ruff==0.15.0",
+]
+
+typecheck = [
+  "capellambse>=0.8.1",
+  "awesomeversion==25.8.0",
+  "types-pyyaml==6.0.12.20250915",
+  "types-requests==2.32.4.20260107",
+  "types-setuptools==80.10.0.20260124",
+  "types-six==1.17.0.20251009",
+]
+
+docs = [
+  "furo==2025.12.19",
+  "ipython==9.10.0",
+  "jinja2==3.1.6",
+]
+
+[tool.cibuildwheel]
+enable = "pypy"
+build-frontend = "build"
+before-build = []
+test-groups = ["test"]
+test-command = ["cd {project}", "pytest -n auto"]
+
+[tool.cibuildwheel.linux]
+before-build = [
+]
+repair-wheel-command = [
+  "pipx run abi3audit {wheel}",
+  "auditwheel repair -w {dest_dir} {wheel}",
+]
+
+[tool.cibuildwheel.windows]
+test-command = ["cd /d {project}", "pytest -n auto"]
+
+[tool.coverage.run]
+branch = true
+command_line = "-m pytest"
+source = ["capellambse"]
+
+[tool.coverage.report]
+skip_covered = true
+
+[tool.distutils.bdist_wheel]
+py_limited_api = "cp311"
+
+[tool.docformatter]
+wrap-descriptions = 72
+wrap-summaries = 79
+
+[tool.mypy]
+check_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+show_error_codes = true
+warn_redundant_casts = true
+warn_unreachable = true
+warn_unused_ignores = true
+plugins = ["mypypp.deprecated"]
+python_version = "3.12"
+
+[tool.pytest.ini_options]
+addopts = """
+  -W error::pytest.PytestUnraisableExceptionWarning
+  --import-mode=importlib
+  --strict-config
+  --strict-markers
+  --tb=short
+"""
+testpaths = ["tests"]
+xfail_strict = "true"
+
+[tool.ruff]
+line-length = 79
+
+[tool.ruff.lint]
+extend-select = [
+  "ARG",    # flake8-unused-arguments
+  "ASYNC",  # flake8-async
+  "B",      # flake8-bugbear
+  "BLE",    # flake8-blind-except
+  "C4",     # flake8-comprehensions
+  "D",      # pydocstyle
+  "D212",   # "Multi-line docstring summary should start at the first line"
+  "D402",   # "First line should not be the function’s 'signature'"
+  "D417",   # "Missing argument descriptions in the docstring"
+  "DTZ",    # flake8-datetimez
+  "E",      # pycodestyle
+  "ERA",    # eradicate
+  "F",      # pyflakes
+  "FA",     # flake8-future-annotations
+  "FIX",    # flake8-fixme
+  "FLY",    # flynt
+  "FURB",   # refurb
+  "G",      # flake8-logging-format
+  "I",      # isort
+  "ICN",    # flake8-import-conventions
+  "ISC001", # "Implicitly concatenated string literals on one line"
+  "ISC003", # "Explicitly concatenated string should be implicitly concatenated"
+  "LOG",    # flake8-logging
+  "PERF",   # perflint
+  "PGH",    # pygrep-hooks
+  "PIE",    # flake8-pie
+  "PL",     # pylint
+  "PT",     # flake8-pytest-style
+  "PYI",    # flake8-pyi
+  "RET",    # flake8-return
+  "RUF",    # ruff
+  "SIM",    # flake8-simplify
+  "SLOT",   # flake8-slots
+  "T10",    # flake8-debugger
+  "T20",    # flake8-print
+  "TC",     # flake8-type-checking
+  "UP",     # pyupgrade
+  "W",      # pycodestyle
+  "YTT",    # flake8-2020
+]
+ignore = [
+  "D1",      # Missing docstring in _
+  "D201",    # No blank lines allowed before function docstring  # auto-formatting
+  "D202",    # No blank lines allowed after function docstring  # auto-formatting
+  "D203",    # 1 blank line required before class docstring  # auto-formatting
+  "D204",    # 1 blank line required after class docstring  # auto-formatting
+  "D211",    # No blank lines allowed before class docstring  # auto-formatting
+  "D213",    # Multi-line docstring summary should start at the second line
+  "DTZ001",  # `tzinfo=None` passed to `datetime.datetime()`
+  "DTZ005",  # `tz=None` passed to `datetime.datetime.now()`
+  "E402",    # Module level import not at top of file
+  "E501",    # Line too long # auto-formatting
+  "F403",    # `from _ import *` used; unable to detect undefined names
+  "F405",    # `_` may be undefined, or defined from star imports
+  "PLC0414", # Import alias does not rename original package # used for explicit reexports
+  "PLR0904", # Too many public methods
+  "PLR0911", # Too many return statements
+  "PLR0912", # Too many branches
+  "PLR0913", # Too many arguments in function definition
+  "PLR0914", # Too many local variables
+  "PLR0915", # Too many statements
+  "PLR0916", # Too many Boolean expressions
+  "PLR0917", # Too many positional arguments
+  "PLR2004", # Magic value used in comparison, consider replacing `_` with a constant variable
+  "PLW0603", # Using the global statement to update `_` is discouraged
+  "PLW2901", # `for` loop variable `_` overwritten by assignment target
+  "RUF005",  # Consider iterable unpacking instead of concatenation  # false-positives with NamedTuple and overridden __add__ (i.e. Vector2D)
+  "SIM108",  # Use ternary operator instead of `if`-`else`-block
+  "TC001",   # Move first-party import into type-checking block # Sphinx needs all imports at runtime
+  "TC002",   # Move third-party import into type-checking block # Sphinx needs all imports at runtime
+  "TC003",   # Move stdlib import into type-checking block # Sphinx needs all imports at runtime
+]
+
+[tool.ruff.lint.extend-per-file-ignores]
+"__init__.py" = [
+  "PLE0604", # Invalid object in `__all__`, must contain only strings  # false-positive when unpacking imported submodule __all__
+]
+"tests/test_*.py" = [
+  "F811",    # Redefinition of unused `_` from line _
+  "PGH003",  # Use specific rule codes when ignoring type issues
+  "PLR2004", # Magic value used in comparison, consider replacing `_` with a constant variable
+]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = []
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+ignore-decorators = ["typing.overload"]
+
+[tool.setuptools]
+platforms = ["any"]
+zip-safe = false
+
+[tool.setuptools.package-data]
+"*" = ["py.typed"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[[tool.setuptools-rust.ext-modules]]
+optional = true
+
+[tool.setuptools_scm]
+# This section must exist for setuptools_scm to work
+
+[tool.uv]
+default-groups = ["dev", "test", "typecheck"]
