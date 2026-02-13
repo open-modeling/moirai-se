@@ -1,9 +1,10 @@
 from capellambse import helpers
 
 from arcadiaMergeTool.helpers import ExitCodes
-from arcadiaMergeTool.merger.processors._processor import clone, doProcess, process, recordMatch
+from arcadiaMergeTool.merger.processors._processor import clone, doProcess, process
 from capellambse.metamodel import pa
 import capellambse.model as m
+from arcadiaMergeTool.merger.processors.recordMatch import recordMatch
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger

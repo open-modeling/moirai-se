@@ -11,8 +11,8 @@ from arcadiaMergeTool.merger.processors._processor import (
     clone,
     doProcess,
     process,
-    recordMatch,
 )
+from arcadiaMergeTool.merger.processors.recordMatch import recordMatch
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
 from . import deployment

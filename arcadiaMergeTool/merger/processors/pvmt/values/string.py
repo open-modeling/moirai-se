@@ -5,12 +5,13 @@ import capellambse.metamodel.information.datavalue as dv
 import capellambse.metamodel as mm
 
 from arcadiaMergeTool.helpers import ExitCodes
+from arcadiaMergeTool.merger.processors.recordMatch import recordMatch
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
 
 import capellambse.model as m
-from arcadiaMergeTool.merger.processors._processor import clone, process, doProcess, recordMatch
+from arcadiaMergeTool.merger.processors._processor import clone, process, doProcess
 
 LOGGER = getLogger(__name__)
 

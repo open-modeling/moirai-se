@@ -1,5 +1,6 @@
+import sys
+from collections.abc import Callable
 from functools import singledispatch
-from typing import Callable
 
 import capellambse.metamodel as mm
 import capellambse.metamodel.capellacore as cc
@@ -19,10 +20,10 @@ T = m.T_co
 type GeneratorCallback = Callable[[T, m.ElementList[T], MergerElementMappingMap] , T]
 
 def recordMatch(matchColl: list[T], x: T, destParent: T, destColl: m.ElementList[T], mapping: MergerElementMappingMap) -> bool:
-    """Record match in cache or fail
-    
+    """Record match in cache or fail.
+
     Parameters
-    ==========
+    ----------
     matchColl:
         Collection of Elements to record in cache
     x:
@@ -31,9 +32,9 @@ def recordMatch(matchColl: list[T], x: T, destParent: T, destColl: m.ElementList
         Potential parent element
     mapping:
         Cache to put element in
-    
+
     Returns
-    =======
+    -------
     True for success, False otherwise
     """
 
@@ -74,7 +75,7 @@ def recordMatch(matchColl: list[T], x: T, destParent: T, destColl: m.ElementList
                 destParent.__class__,
                 x._model.name,
                 x._model.uuid,
-            )        
+            )
         destEl = clone(x, destColl, mapping)
 
     mapping[(x._model.uuid, x.uuid)] = (destEl, fromLibrary)
@@ -85,7 +86,7 @@ def recordMatch(matchColl: list[T], x: T, destParent: T, destColl: m.ElementList
 @singledispatch
 def clone (x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap) -> T:
     LOGGER.fatal(f"[{clone.__qualname__}] default generator called, must be overloaded")
-    exit(str(ExitCodes.MergeFault))
+    sys.exit(str(ExitCodes.MergeFault))
 
 # generic function; will be extended across modules
 @singledispatch
@@ -241,7 +242,7 @@ def doProcess (
         # if cachedFunction.description != x.description:
         #     errors["description warn"] = "known description does not match processed"
 
-        if len(errors):
+        if len(errors) > 0:
             LOGGER.warning(
                 f"[{doProcess.__qualname__}] Fields does not match recorded, element uuid [%s], model name [%s], uuid [%s], warnings [%s]",
                 x.uuid,
