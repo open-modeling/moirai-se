@@ -1,13 +1,19 @@
+import sys
+
 import capellambse.metamodel as mm
+import capellambse.model as m
 from capellambse import helpers
 
-import capellambse.model as m
-from arcadiaMergeTool.helpers import ExitCodes
-from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
-from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
-
-from arcadiaMergeTool.merger.processors._processor import clone, process, doProcess, recordMatch
+from arcadiaMergeTool.helpers import ExitCodes
+from arcadiaMergeTool.helpers.types import MergerElementMappingMap
+from arcadiaMergeTool.merger.processors._processor import (
+    clone,
+    doProcess,
+    process,
+    recordMatch,
+)
+from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
 LOGGER = getLogger(__name__)
 
@@ -24,14 +30,7 @@ def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
         review = x.review,
         sid = x.sid,
         summary = x.summary,
-    ) 
-
-    # TODO: fix PVMT
-    # .applied_property_value_groups = []
-    # .applied_property_values = []
-    # .property_value_groups = []
-    # .property_values = []
-    # .pvmt = 
+    )
 
     if x.status is not None:
         newComp.status = x.status
@@ -46,10 +45,10 @@ def _(
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ) -> bool:
-    """Find and merge Abstract Capability Realizations
+    """Find and merge Abstract Capability Realizations.
 
     Parameters
-    ==========
+    ----------
     x:
         Abstract Capability Realization to process
     dest:
@@ -62,7 +61,7 @@ def _(
         Full mapping of the elements to the corresponding models
 
     Returns
-    =======
+    -------
     True if element was completely processed, False otherwise
     """
     if mapping.get((x._model.uuid, x.uuid)) is not None:
@@ -72,7 +71,7 @@ def _(
     if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of type ModelElement
         # safeguard for direct call
         return False
-        
+
     destParentEntry = mapping.get((modelParent._model.uuid, modelParent.uuid)) # pyright: ignore[reportAttributeAccessIssue] expect ModelElement here with valid uuid
     if destParentEntry is None:
         LOGGER.fatal(f"[{process.__qualname__}] Element parent was not found in cache, uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
@@ -84,9 +83,9 @@ def _(
             x._model.name,
             x._model.uuid,
         )
-        exit(str(ExitCodes.MergeFault))
+        sys.exit(str(ExitCodes.MergeFault))
 
-    (destParent, fromLibrary) = destParentEntry
+    (destParent, _fromLibrary) = destParentEntry
 
     targetCollection = None
 
@@ -104,14 +103,14 @@ def _(
             x._model.name,
             x._model.uuid,
         )
-        exit(str(ExitCodes.MergeFault))
+        sys.exit(str(ExitCodes.MergeFault))
 
     mappedSource = mapping.get((x._model.uuid, x.source.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect source is already there
     mappedTarget = mapping.get((x._model.uuid, x.target.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect target is already there
     if mappedSource is None or mappedTarget is None:
         # if source or target is not mapped, postpone allocation processing
         return False
-    
-    matchList = list(filter(lambda y: y.source == mappedSource[0] and x.target == mappedTarget[0], targetCollection)) # pyright: ignore[reportOptionalSubscript] check for none is above, mappedSource and mappedTarget are safe
+
+    matchList = list(filter(lambda y: y.source == mappedSource[0] and y.target == mappedTarget[0], targetCollection)) # pyright: ignore[reportOptionalSubscript] check for none is above, mappedSource and mappedTarget are safe
 
     return recordMatch(matchList, x, destParent, targetCollection, mapping)

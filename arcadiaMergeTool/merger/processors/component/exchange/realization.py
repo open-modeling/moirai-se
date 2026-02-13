@@ -112,6 +112,6 @@ def _(
         # if source or target is not mapped, postpone allocation processing
         return False
     
-    matchList = list(filter(lambda y: y.source == mappedSource[0] and x.target == mappedTarget[0], targetCollection)) # pyright: ignore[reportOptionalSubscript] check for none is above, mappedSource and mappedTarget are safe
+    matchList = list(filter(lambda y: y.source == mappedSource[0] and y.target == mappedTarget[0], targetCollection)) # pyright: ignore[reportOptionalSubscript] check for none is above, mappedSource and mappedTarget are safe
 
     return recordMatch(matchList, x, destParent, targetCollection, mapping)
