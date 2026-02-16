@@ -1,6 +1,6 @@
 from arcadiaMergeTool import getLogger
 
-from . import values, value_groups, value_packages
+from . import value_groups, value_packages, values
 
 __all__ = [
     "value_groups",

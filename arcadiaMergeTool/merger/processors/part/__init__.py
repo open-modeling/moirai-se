@@ -1,3 +1,5 @@
+"""Find and merge Parts."""
+
 import sys
 
 import capellambse.metamodel as mm
@@ -8,11 +10,12 @@ from arcadiaMergeTool import getLogger
 from arcadiaMergeTool.helpers import ExitCodes
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool.merger.processors._processor import (
+    Processed,
     clone,
-    doProcess,
+    match,
     process,
 )
-from arcadiaMergeTool.merger.processors.recordMatch import recordMatch
+from arcadiaMergeTool.merger.processors.helpers import getDestParent
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
 from . import deployment
@@ -26,9 +29,8 @@ LOGGER = getLogger(__name__)
 T = mm.cs.Part
 
 @clone.register
-def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
-    newComp = coll.create(helpers.xtype_of(x._element),
-        type = mapping[(x._model.uuid, x.type.uuid)][0], # pyright: ignore[reportOptionalMemberAccess] expect type exists and uuid is valid
+def _(x: T, coll: m.ElementList[T], _mapping: MergerElementMappingMap):
+    return coll.create(helpers.xtype_of(x._element),
         name = x.name,
         description = x.description,
         is_abstract = x.is_abstract,
@@ -49,80 +51,28 @@ def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
         visibility = x.visibility,
     )
 
-    if x.status is not None:
-        newComp.status = x.status  # pyright: ignore[reportAttributeAccessIssue] assume status is already there
-
-    return newComp
-
-
 @process.register
 def _(
     x: T,
-    dest: CapellaMergeModel,
-    src: CapellaMergeModel,
-    base: CapellaMergeModel,
+    _dest: CapellaMergeModel,
+    _src: CapellaMergeModel,
+    _base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
-) -> bool:
-    """Find and merge Parts.
-
-    Parameters
-    ----------
-    x:
-        Part to process
-    dest:
-        Destination model to add parts to
-    src:
-        Source model to take parts from
-    base:
-        Base model to check parts against
-    mapping:
-        Full mapping of the elements to the corresponding models
-
-    Returns
-    -------
-    True if element was completely processed, False otherwise
-    """
-    if mapping.get((x._model.uuid, x.uuid)) is not None:
-        return True
-
-    modelParent = x.parent
-    if (not doProcess(modelParent, dest, src, base, mapping) # pyright: ignore[reportArgumentType] expect modelParent is of type ModelElement
-        or not doProcess(x.type, dest, src, base, mapping) # pyright: ignore[reportArgumentType] expect x.type is valid property
-    ):
-        # part is merely a link to a component, check if component can be referenced
-        # if not, stop processing to retry later
-        return False  # safeguard for direct call
-
-    destParentEntry = mapping.get((modelParent._model.uuid, modelParent.uuid)) # pyright: ignore[reportAttributeAccessIssue] expect ModelElement here with valid uuid
-    if destParentEntry is None:
-        LOGGER.fatal(f"[{process.__qualname__}] Element parent was not found in cache, name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
-            x.name,
-            x.uuid,
-            x.__class__,
-            modelParent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-            modelParent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-            modelParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
-        sys.exit(str(ExitCodes.MergeFault))
-
-    (destParent, _fromLibrary) = destParentEntry
-
+):
     targetCollection = None
+
+    destParent = getDestParent(x, mapping)
 
     if (isinstance(destParent, (mm.sa.SystemComponentPkg, mm.la.LogicalComponentPkg, mm.pa.PhysicalComponentPkg))
         ) and destParent.parts[0] == x:
-        # HACK: assume System is a very first root part
         # map system to system and assume it's done
-        mapping[(x._model.uuid, x.uuid)] = (destParent.parts[0], False)
-        return True
+        mapping[(x._model.uuid, x.uuid)] = (destParent.parts.filter(lambda y: y.name == x.name)[0], False)
+        return Processed
 
     if isinstance(destParent, mm.epbs.ConfigurationItemPkg) and destParent.configuration_items[0] == x:
-        # HACK: assume System is a very first root configuratiobn item
         # map system to system and assume it's done
-        mapping[(x._model.uuid, x.uuid)] = (destParent.configuration_items[0], False)
-        return True
+        mapping[(x._model.uuid, x.uuid)] = (destParent.configuration_items.filter(lambda y: y.name == x.name)[0], False)
+        return Processed
 
     if (isinstance(destParent, (mm.cs.Component, mm.pa.PhysicalComponentPkg, mm.sa.SystemComponentPkg, mm.la.LogicalComponentPkg))
     ):
@@ -143,8 +93,14 @@ def _(
         )
         sys.exit(str(ExitCodes.MergeFault))
 
+    return targetCollection
+
+@match.register
+def _(x: T,
+    _destParent: m.ModelElement,
+    coll: m.ElementList[T],
+    _mapping: MergerElementMappingMap
+):
     # use weak match by name
     # TODO: implement strong match by PVMT properties
-    matchList = list(filter(lambda y: y.name == x.name, targetCollection))
-
-    return recordMatch(matchList, x, destParent, targetCollection, mapping)
+    return list(filter(lambda y: y.name == x.name, coll))

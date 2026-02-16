@@ -1,18 +1,36 @@
-import capellambse.metamodel.information.datavalue as dv
-import capellambse.metamodel.information.datatype as dt
+"""Find and merge Literal Values."""
+
+import sys
+
 import capellambse.metamodel.information as inf
+import capellambse.metamodel.information.datatype as dt
+import capellambse.metamodel.information.datavalue as dv
+import capellambse.model as m
 from capellambse import helpers
 
-from arcadiaMergeTool.helpers import ExitCodes, create_element
-from arcadiaMergeTool.merger.processors.recordMatch import recordMatch
-from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
-from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
+from arcadiaMergeTool.helpers import ExitCodes, create_element
+from arcadiaMergeTool.helpers.types import MergerElementMappingMap
+from arcadiaMergeTool.merger.processors._processor import (
+    Continue,
+    Postponed,
+    Processed,
+    clone,
+    doProcess,
+    match,
+    preprocess,
+    process,
+)
+from arcadiaMergeTool.merger.processors.helpers import getDestParent
+from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
-import capellambse.model as m
-from arcadiaMergeTool.merger.processors._processor import clone, process, doProcess
-
-from . import binary_expression, boolean, enumeration, numeric_reference, opaque_expression
+from . import (
+    binary_expression,
+    boolean,
+    enumeration,
+    numeric_reference,
+    opaque_expression,
+)
 
 __all__ = [
     "binary_expression",
@@ -28,101 +46,50 @@ T = dv.LiteralNumericValue | dv.LiteralStringValue
 
 @clone.register
 def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
-    newComp = coll.create(helpers.xtype_of(x._element))
+    newComp = coll.create(helpers.xtype_of(x._element),
+        description = x.description,
+        is_abstract = x.is_abstract,
+        is_visible_in_doc = x.is_visible_in_doc,
+        is_visible_in_lm = x.is_visible_in_lm,
+        name = x.name,
+        review = x.review,
+        sid = x.sid,
+        summary = x.summary,
+        value = x.value,
+    )
 
-    newComp.description = x.description # pyright: ignore[reportAttributeAccessIssue]
-    newComp.is_abstract = x.is_abstract # pyright: ignore[reportAttributeAccessIssue]
-    newComp.is_visible_in_doc = x.is_visible_in_doc # pyright: ignore[reportAttributeAccessIssue]
-    newComp.is_visible_in_lm = x.is_visible_in_lm # pyright: ignore[reportAttributeAccessIssue]
-    newComp.name = x.name # pyright: ignore[reportAttributeAccessIssue]
-    newComp.review = x.review # pyright: ignore[reportAttributeAccessIssue]
-    newComp.sid = x.sid # pyright: ignore[reportAttributeAccessIssue]
-    newComp.summary = x.summary # pyright: ignore[reportAttributeAccessIssue]
-    newComp.value = x.value # pyright: ignore[reportAttributeAccessIssue]
-
-
-    # TODO: fix PVMT
-    # .applied_property_value_groups = 
-    # .applied_property_values = []
-    # .property_value_groups = [0]
-    # .property_value_pkgs = []
-    # .property_values = []
-    # .pvmt = 
-
-    if x.status is not None:
-        newComp.status = x.status
     if x.unit is not None:
         mappedType = mapping[(x._model.uuid, x.unit.uuid)]
         newComp.unit = mappedType[0]
 
     return newComp
 
+@preprocess.register
+def _(x: T,
+    dest: CapellaMergeModel,
+    src: CapellaMergeModel,
+    base: CapellaMergeModel,
+    mapping: MergerElementMappingMap
+):
+    if doProcess(x.unit, dest, src, base, mapping) == Postponed: # pyright: ignore[reportArgumentType] expect modelParent is compatible with ModelElement
+        return Postponed
+    return Continue
+
 @process.register
 def _(
     x: T,
     dest: CapellaMergeModel,
-    src: CapellaMergeModel,
-    base: CapellaMergeModel,
+    _src: CapellaMergeModel,
+    _base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
-) -> bool:
-    """Find and merge Literal Values
-
-    Parameters
-    ==========
-    x:
-        Literal Value to process
-    dest:
-        Destination model to add Literal Values to
-    src:
-        Source model to take Literal Values from
-    base:
-        Base model to check Literal Values against
-    mapping:
-        Full mapping of the elements to the corresponding models
-
-    Returns
-    =======
-    True if element was completely processed, False otherwise
-    """
-    if mapping.get((x._model.uuid, x.uuid)) is not None:
-        return True
-
-    # recursively check all direct parents for existence and continue only if parents agree
-    modelParent = x.parent
-    if (not doProcess(modelParent, dest, src, base, mapping) # pyright: ignore[reportArgumentType] expect modelParent is compatible with ModelElement
-        or not doProcess(x.unit, dest, src, base, mapping) # pyright: ignore[reportArgumentType] expect modelParent is compatible with ModelElement
-    ):
-        # unit is vital property, wait for it
-        return False
-    
-    destParentEntry = mapping.get((modelParent._model.uuid, modelParent.uuid)) # pyright: ignore[reportAttributeAccessIssue] expect ModelElement here with valid uuid
-    if destParentEntry is None:
-        LOGGER.fatal(f"[{process.__qualname__}] Element parent was not found in cache, name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
-            x.name,
-            x.uuid,
-            x.__class__,
-            modelParent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-            modelParent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-            modelParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
-        exit(str(ExitCodes.MergeFault))
-
-    (destParent, fromLibrary) = destParentEntry
-
+):
     targetCollection = None
 
-    if (isinstance(destParent, dt.Enumeration)):
+    destParent = getDestParent(x, mapping)
+
+    if isinstance(destParent, (dt.Enumeration, dt.BooleanType, dt.NumericType, dt.StringType)):
         targetCollection = destParent.data_values
-    elif (isinstance(destParent, dt.BooleanType)):
-        targetCollection = destParent.data_values
-    elif (isinstance(destParent, dt.NumericType)):
-        targetCollection = destParent.data_values
-    elif (isinstance(destParent, dt.StringType)):
-        targetCollection = destParent.data_values
-    elif (isinstance(destParent, dv.BinaryExpression)
-        or isinstance(destParent, inf.ExchangeItemElement)
+    elif (isinstance(destParent, (dv.BinaryExpression, inf.ExchangeItemElement))
     ):
         el =create_element(dest.model, destParent, x)
 
@@ -136,14 +103,12 @@ def _(
         el.summary = x.summary
         el.value = x.value
 
-        if x.status is not None:
-            el.status = x.status
         if x.unit is not None:
             mappedType = mapping[(x._model.uuid, x.unit.uuid)]
             el.unit = mappedType[0]
 
         mapping[(x._model.uuid, x.uuid)] = (el, False)
-        return True
+        return Processed
     else:
         LOGGER.fatal(
             f"[{process.__qualname__}] Literal Values parent is not a valid parent, Literal Values name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
@@ -156,10 +121,16 @@ def _(
             x._model.name,
             x._model.uuid,
         )
-        exit(str(ExitCodes.MergeFault))
+        sys.exit(str(ExitCodes.MergeFault))
 
+    return targetCollection
+
+@match.register
+def _(x: T,
+    _destParent: m.ModelElement,
+    coll: m.ElementList[T],
+    _mapping: MergerElementMappingMap
+):
     # use weak match by name
     # TODO: implement strong match by PVMT properties
-    matchList = list(filter(lambda y: y.name == x.name, targetCollection))
-
-    return recordMatch(matchList, x, destParent, targetCollection, mapping)
+    return list(filter(lambda y: y.name == x.name, coll))

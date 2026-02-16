@@ -112,7 +112,7 @@ def mergeExtensions(
                                         origin is None,
                                         target is None,
                                     )
-                                    exit(str(ExitCodes.MergeFault))
+                                    sys.exit(str(ExitCodes.MergeFault))
                         else:
                             LOGGER.warning(
                                 f"[{mergeExtensions.__qualname__}] Cache: unknown catalog element [%s] does not have origin",
@@ -216,7 +216,7 @@ def mergeExtensions(
                                             f"[{mergeExtensions.__qualname__}] Merge: can't copy RPL into target model",
                                             ex,
                                         )
-                                        exit(str(ExitCodes.MergeFault))
+                                        sys.exit(str(ExitCodes.MergeFault))
                                 else:
                                     elementsMappingMap[(elem._model.uuid, elem.uuid)] = (targetElem, True)
                                     # TODO: implement sanity check to ensure replicas consistency across the models

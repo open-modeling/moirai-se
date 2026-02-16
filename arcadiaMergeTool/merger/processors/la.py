@@ -1,18 +1,21 @@
-from arcadiaMergeTool.merger.processors._processor import process, doProcess
+import capellambse.model as m
 from capellambse.metamodel import la
-from capellambse.model import ModelElement
-from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
-from arcadiaMergeTool.helpers.types import MergerElementMappingMap
+
 from arcadiaMergeTool import getLogger
+from arcadiaMergeTool.helpers.types import MergerElementMappingMap
+from arcadiaMergeTool.merger.processors._processor import Processed, process
+from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
 LOGGER = getLogger(__name__)
 
+T = la.LogicalComponentPkg | la.CapabilityRealizationPkg | la.LogicalFunctionPkg | la.LogicalArchitecture
+
 @process.register
 def _(
-    x: la.LogicalComponentPkg | la.CapabilityRealizationPkg | la.LogicalFunctionPkg | la.LogicalArchitecture,
+    x: T,
     dest: CapellaMergeModel,
-    src: CapellaMergeModel,
-    base: CapellaMergeModel,
+    _src: CapellaMergeModel,
+    _base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ) -> bool:
     LOGGER.debug(
@@ -37,4 +40,4 @@ def _(
 
         mapping[(x._model.uuid, x.uuid)] = (package, False)
 
-    return True
+    return Processed

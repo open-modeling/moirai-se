@@ -1,17 +1,21 @@
-from arcadiaMergeTool.merger.processors._processor import process, doProcess
+import capellambse.model as m
 from capellambse.metamodel import epbs
-from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
-from arcadiaMergeTool.helpers.types import MergerElementMappingMap
+
 from arcadiaMergeTool import getLogger
+from arcadiaMergeTool.helpers.types import MergerElementMappingMap
+from arcadiaMergeTool.merger.processors._processor import Processed, process
+from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
 LOGGER = getLogger(__name__)
 
+T = epbs.ConfigurationItemPkg | epbs.EPBSArchitecture
+
 @process.register
 def _(
-    x: epbs.ConfigurationItemPkg | epbs.EPBSArchitecture,
+    x: T,
     dest: CapellaMergeModel,
-    src: CapellaMergeModel,
-    base: CapellaMergeModel,
+    _src: CapellaMergeModel,
+    _base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ) -> bool:
     LOGGER.debug(
@@ -29,6 +33,4 @@ def _(
         elif isinstance(x, epbs.ConfigurationItemPkg):
             mapping[(x._model.uuid, x.uuid)] = (dest.model.epbs.configuration_item_pkg, False)
 
-    return True
-
-epbs.PhysicalArtifactRealization
+    return Processed

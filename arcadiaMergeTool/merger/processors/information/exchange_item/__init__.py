@@ -1,14 +1,25 @@
+"""Find and merge Exchange Items."""
+
+import sys
+
 import capellambse.metamodel as mm
+import capellambse.model as m
 from capellambse import helpers
 
-from arcadiaMergeTool.helpers import ExitCodes
-from arcadiaMergeTool.merger.processors.recordMatch import recordMatch
-from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
-from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
-
-import capellambse.model as m
-from arcadiaMergeTool.merger.processors._processor import clone, process, doProcess
+from arcadiaMergeTool.helpers import ExitCodes
+from arcadiaMergeTool.helpers.types import MergerElementMappingMap
+from arcadiaMergeTool.merger.processors._processor import (
+    Continue,
+    Postponed,
+    clone,
+    doProcess,
+    match,
+    preprocess,
+    process,
+)
+from arcadiaMergeTool.merger.processors.helpers import getDestParent
+from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
 from . import allocation, element
 
@@ -22,7 +33,7 @@ LOGGER = getLogger(__name__)
 T = mm.information.ExchangeItem
 
 @clone.register
-def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
+def _(x: T, coll: m.ElementList[T], _mapping: MergerElementMappingMap):
     newComp = coll.create(helpers.xtype_of(x._element),
         exchange_mechanism = x.exchange_mechanism,
         is_abstract = x.is_abstract,
@@ -33,72 +44,35 @@ def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
         review = x.review,
         sid = x.sid,
         summary = x.summary,
-    ) 
+    )
 
-    # TODO: fix PVMT
-    # .property_value_groups = []
-    # .property_values = []
-    # .pvmt = 
-
-    if x.status is not None:
-        newComp.status = x.status
     if x.super is not None:
         newComp.super = x.super
 
     return newComp
 
-@process.register
-def _(
-    x: T,
+@preprocess.register
+def _(x: T,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
+    mapping: MergerElementMappingMap
+):
+    if doProcess(x.super, dest, src, base, mapping) == Postponed: # pyright: ignore[reportArgumentType] expect source exists
+        return Postponed
+    return Continue
+
+@process.register
+def _(
+    x: T,
+    _dest: CapellaMergeModel,
+    _src: CapellaMergeModel,
+    _base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
-) -> bool:
-    """Find and merge Exchange Items
-
-    Parameters
-    ==========
-    x:
-        Exchange Item to process
-    dest:
-        Destination model to add Exchange Items to
-    src:
-        Source model to take Exchange Items from
-    base:
-        Base model to check Exchange Items against
-    mapping:
-        Full mapping of the elements to the corresponding models
-
-    Returns
-    =======
-    True if element was completely processed, False otherwise
-    """
-    if mapping.get((x._model.uuid, x.uuid)) is not None:
-        return True
-
-    modelParent = x.parent
-    if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of type ModelElement
-        # safeguard for direct call
-        return False
-
-    destParentEntry = mapping.get((modelParent._model.uuid, modelParent.uuid)) # pyright: ignore[reportAttributeAccessIssue] expect ModelElement here with valid uuid
-    if destParentEntry is None:
-        LOGGER.fatal(f"[{process.__qualname__}] Element parent was not found in cache, name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
-            x.name,
-            x.uuid,
-            x.__class__,
-            modelParent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-            modelParent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-            modelParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
-        exit(str(ExitCodes.MergeFault))
-
-    (destParent, fromLibrary) = destParentEntry
-
+):
     targetCollection = None
+
+    destParent = getDestParent(x, mapping)
 
     if isinstance(destParent, mm.cs.InterfacePkg):
         targetCollection = destParent.exchange_items
@@ -114,10 +88,16 @@ def _(
             x._model.name,
             x._model.uuid,
         )
-        exit(str(ExitCodes.MergeFault))
+        sys.exit(str(ExitCodes.MergeFault))
 
+    return targetCollection
+
+@match.register
+def _(x: T,
+    _destParent: m.ModelElement,
+    coll: m.ElementList[T],
+    _mapping: MergerElementMappingMap
+):
     # use weak match by name
     # TODO: implement strong match by PVMT properties
-    matchList = list(filter(lambda y: y.name == x.name, targetCollection)) # pyright: ignore[reportAttributeAccessIssue] expect name is there
-
-    return recordMatch(matchList, x, destParent, targetCollection, mapping)
+    return list(filter(lambda y: y.name == x.name, coll))

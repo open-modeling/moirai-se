@@ -1,31 +1,36 @@
+import sys
 from collections import deque
 from venv import logger
 
+import capellambse.metamodel as mm
+import capellambse.metamodel.libraries as li
+import capellambse.model as m
+from capellambse.metamodel import re
+from capellambse.model import ModelElement
+
 from arcadiaMergeTool import getLogger
 from arcadiaMergeTool.helpers import ExitCodes
-from arcadiaMergeTool.helpers.types import MergerElementMappingMap, ModelElement_co
-from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
-from capellambse.model import ModelElement
-import capellambse.model as m
-import capellambse.metamodel as mm
-import capellambse.metamodel.re as re
-import capellambse.metamodel.libraries as li
+from arcadiaMergeTool.helpers.types import (
+    MergerElementMappingMap,
+    ModelElement_co,
+)
 from arcadiaMergeTool.merger.processors import doProcess
+from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
 LOGGER = getLogger(name=__name__)
 
 def _makeModelElementList(
     model: CapellaMergeModel, clsname: type[ModelElement_co] | None = None
 ) -> deque[m._obj.ModelElement]:
-    """Fetch all model elements from model
+    """Fetch all model elements from model.
 
     Parameters
-    ==========
+    ----------
     model:
         Source model to fetch all data from
 
     Returns
-    =======
+    -------
     Filtered list of found objects
     """
 
@@ -50,7 +55,7 @@ def mergeElements(
     src: list[CapellaMergeModel],
     mapping: MergerElementMappingMap,
 ):
-    """Merge models
+    """Merge models.
 
     dest: Description
     :type dest: CapellaMergeModel
@@ -94,7 +99,7 @@ def mergeElements(
                     LOGGER.fatal(f"[{mergeElements.__qualname__}] Processing retry threshold exceeded [%s], element name [%s], uuid [%s], class [%s], model [%s]; queue length [%s]", counter, elem.name, elem.uuid, elem.__class__, elem._model.name, len(lst)) # type: ignore
                 else:
                     LOGGER.fatal(f"[{mergeElements.__qualname__}] Processing retry threshold exceeded [%s], element uuid [%s], class [%s], model [%s]; queue length [%s]", counter, elem.uuid, elem.__class__, elem._model.name, len(lst)) # type: ignore
-                exit(str(ExitCodes.MergeFault))
+                sys.exit(str(ExitCodes.MergeFault))
 
             if isinstance(elem, mm.modellingcore.AbstractNamedElement):
                 LOGGER.debug(f"[{mergeElements.__qualname__}] Process element name [%s], uuid [%s], class [%s], model [%s]; queue length [%s], try [%s]", elem.name, elem.uuid, elem.__class__, elem._model.name, len(lst), counter) # type: ignore

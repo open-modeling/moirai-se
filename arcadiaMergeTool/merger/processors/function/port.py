@@ -1,32 +1,65 @@
+"""Find and merge Functuon Ports.
+
+General Cases
+1. Port is bounded to disjoint set of exchanges
+2. Port is bounded to subset of exchanges
+3. Port is bounded to superset of exchanges
+4. Port is bounded to intersecting of exchanges
+
+Merge logic
+1. Port depends on FunctionExchange, not opposite
+2. Exchange defines transferrable elements
+3. If exchange from source model is not landed, delay port landing as well
+
+For subset of exchanges - nothing to do
+For superset of exchanges - add new exchanges to known port, mark those exchanges as policy violation
+For disjoint set of exchanges - current port is the main port, mark port and exchanges as policy violation
+For intersected set - merge fault, do not try to guess, request explicit model update
+"""
+
+import sys
+
 import capellambse.metamodel as mm
 import capellambse.model as m
 from capellambse import helpers
 
-from arcadiaMergeTool.helpers import ExitCodes
-from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
-from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool import getLogger
-
-from arcadiaMergeTool.merger.processors._processor import process, doProcess
+from arcadiaMergeTool.helpers import ExitCodes
+from arcadiaMergeTool.helpers.types import MergerElementMappingMap
+from arcadiaMergeTool.merger.processors._processor import (
+    Postponed,
+    clone,
+    match,
+    process,
+)
+from arcadiaMergeTool.merger.processors.helpers import getDestParent
+from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
 LOGGER = getLogger(__name__)
 
 T = mm.fa.FunctionPort
 U = mm.fa.FunctionalExchange
 V = mm.fa.AbstractFunction
+W = mm.activity.ActivityNode
 
-def __findMatchingPort(x: T, targetCollection: m.ElementList[T], destParent: V, srcExch: U | None = None)-> T | None:
-    """Find port based on exchange props
-    
+def __findMatchingPort(x: T, targetCollection: m.ElementList[T], _destParent: V, source: bool, srcExch: U | None = None)-> T | None:
+    """Find port based on exchange props.
+
     Parameters
-    ==========
-    coll:
+    ----------
+    x:
+        Source Element to check against
+    targetCollection:
         Port collection to test
-    exch:
+    destParent:
+        destination parent to check
+    source:
+        Flag for checking source or target end of link
+    srcExch:
         Exchange to match against
 
     Returns
-    =======
+    -------
     Matching port or None
     """
     if srcExch is None:
@@ -38,21 +71,15 @@ def __findMatchingPort(x: T, targetCollection: m.ElementList[T], destParent: V, 
             for ex in port.exchanges:
                 # NOTE: weak match against exchange name
                 # TODO: replace weak match with PVMT based strong match
-                if ex.name == srcExch.name and port.parent == destParent and x.orientation == port.orientation:
+                if (ex.name == srcExch.name
+                    or (source and ex.source is not None and ex.source.name == x.name)
+                    or (not source and ex.target is not None and ex.target.name == x.name)):
                     return port
 
-def __createCompoentPort(x: T, targetCollection: m._obj.ElementList) -> T:
-    """Create port in model
+    return None
 
-    Parameters
-    ==========
-    x: 
-        Source to copy port properties from
-    targetCollection:
-        Collection to add new port into
-
-    """
-
+@clone.register
+def __createCompoentPort(x: T, coll: m.ElementList[T], _mapping: MergerElementMappingMap):
     LOGGER.debug(
         f"[{process.__qualname__}] Create Function Port name [%s], uuid [%s], model name [%s], uuid [%s]",
         x.name,
@@ -60,7 +87,7 @@ def __createCompoentPort(x: T, targetCollection: m._obj.ElementList) -> T:
         x._model.name,
         x._model.uuid,
     )
-    newComp = targetCollection.create(helpers.xtype_of(x._element),
+    newComp = coll.create(helpers.xtype_of(x._element),
         is_control = x.is_control,
         is_control_type = x.is_control_type,
         is_visible_in_doc = x.is_visible_in_doc,
@@ -71,84 +98,28 @@ def __createCompoentPort(x: T, targetCollection: m._obj.ElementList) -> T:
         review = x.review,
         sid = x.sid,
         summary = x.summary,
-    ) 
-
-    # TODO: fix PVMT
-    # .applied_property_value_groups = []
-    # .applied_property_values = []
-    # .property_value_groups = []
-    # .property_values = []
-    # .pvmt =
-
-    # TODO: find a way to copy these properties
+    )
 
     if x.selection is not None:
         newComp.selection = x.selection
     if x.represented_component_port is not None:
         newComp.represented_component_port = x.represented_component_port
-    if x.status is not None:
-        newComp.status = x.status
-
 
     return newComp
 
 @process.register
 def _(
     x: T,
-    dest: CapellaMergeModel,
-    src: CapellaMergeModel,
-    base: CapellaMergeModel,
+    _dest: CapellaMergeModel,
+    _src: CapellaMergeModel,
+    _base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
-) -> bool:
-    """Find and merge Functuon Ports
-
-    Parameters
-    ==========
-    x:
-        Functuon port to process
-    dest:
-        Destination model to add functuon ports to
-    src:
-        Source model to take functuon ports from
-    base:
-        Base model to check functuon ports against
-    mapping:
-        Full mapping of the elements to the corresponding models
-
-    Returns
-    =======
-    True if element was completely processed, False otherwise
-    """
-    if mapping.get((x._model.uuid, x.uuid)) is not None:
-        return True
-
-    modelParent = x.parent
-    if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of type ModelElement
-        # safeguard for direct call
-        return False
-
-    destParentEntry = mapping.get((modelParent._model.uuid, modelParent.uuid)) # pyright: ignore[reportAttributeAccessIssue] expect ModelElement here with valid uuid
-    if destParentEntry is None:
-        LOGGER.fatal(f"[{process.__qualname__}] Element parent was not found in cache, name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
-            x.name,
-            x.uuid,
-            x.__class__,
-            modelParent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-            modelParent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-            modelParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
-        exit(str(ExitCodes.MergeFault))
-
-    (destParent, fromLibrary) = destParentEntry
-
+):
     targetCollection = None
 
-    if (isinstance(destParent, mm.pa.PhysicalFunction)
-        or isinstance(destParent, mm.la.LogicalFunction)
-        or isinstance(destParent, mm.sa.SystemFunction)
-        or isinstance(destParent, mm.oa.OperationalActivity)
+    destParent = getDestParent(x, mapping)
+
+    if (isinstance(destParent, (mm.pa.PhysicalFunction, mm.la.LogicalFunction, mm.sa.SystemFunction, mm.oa.OperationalActivity))
     ):
         if isinstance(x, mm.fa.FunctionInputPort):
             targetCollection = destParent.inputs
@@ -165,7 +136,7 @@ def _(
                 x._model.name,
                 x._model.uuid,
             )
-            exit(str(ExitCodes.MergeFault))
+            sys.exit(str(ExitCodes.MergeFault))
     else:
         LOGGER.fatal(
             f"[{process.__qualname__}] Function Port parent is not a valid parent, Function Port name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
@@ -178,26 +149,19 @@ def _(
             x._model.name,
             x._model.uuid,
         )
-        exit(str(ExitCodes.MergeFault))
+        sys.exit(str(ExitCodes.MergeFault))
 
-    # General Cases
-    # 1. Port is bounded to disjoint set of exchanges
-    # 2. Port is bounded to subset of exchanges
-    # 3. Port is bounded to superset of exchanges
-    # 4. Port is bounded to intersecting of exchanges
+    return targetCollection
 
-    # Merge logic
-    # 1. Port depends on FunctionExchange, not opposite
-    # 2. Exchange defines transferrable elements
-    # 3. If exchange from source model is not landed, delay port landing as well
-    # 
-    # For subset of exchanges - nothing to do
-    # For superset of exchanges - add new exchanges to known port, mark those exchanges as policy violation
-    # For disjoint set of exchanges - current port is the main port, mark port and exchanges as policy violation
-    # For intersected set - merge fault, do not try to guess, request explicit model update
-
-    portCandidates = {}
+@match.register
+def _(x: T,
+    destParent: V,
+    coll: m.ElementList[T],
+    mapping: MergerElementMappingMap
+):
+    portCandidates: dict[str, T | W] = {}
     postpone = False
+    newPort = None
     for ex in x.exchanges:
         exMap = mapping.get((ex._model.uuid, ex.uuid))
         if exMap is None:
@@ -214,20 +178,20 @@ def _(
             postpone = True
             continue
 
-        mappedEx = exMap[0]
+        mappedEx: U = exMap[0] # pyright: ignore[reportAssignmentType] expect exchange is correct type
         if ex.source == x:
             # when exchange is landed from source model it does not have port mapped
             # port mapping performed here to avoid recursive model processing
             if mappedEx.source is None:
                 # potential superset case - exchange exists, but not mapped
                 # find first matching port with exchange sharing same properties
-                port= __findMatchingPort(x, targetCollection, destParent, ex) # pyright: ignore[reportArgumentType] expect targetCollection contains rights elements
+                port= __findMatchingPort(x, coll, destParent, True, ex)
                 if port is not None:
                     portCandidates[port.uuid] = port
                     mappedEx.source = port
                 else:
                     # port was not mapped, add port to the collection
-                    newPort = __createCompoentPort(x, targetCollection)
+                    newPort = __createCompoentPort(x, coll, mapping)
                     portCandidates[newPort.uuid] = newPort
                     mappedEx.source = newPort
                     mapping[(x._model.uuid, x.uuid)] = (newPort, False)
@@ -239,55 +203,30 @@ def _(
             if mappedEx.target is None:
                 # potential superset case - exchange exists, but not mapped
                 # find first matching port with exchange sharing same properties
-                port= __findMatchingPort(x, targetCollection, destParent, ex) # pyright: ignore[reportArgumentType] expect targetCollection contains rights elements
+                port= __findMatchingPort(x, coll, destParent, True, ex)
                 if port is not None:
                     portCandidates[port.uuid] = port
                     mappedEx.target = port
                 else:
                     # port was not mapped, add port to the collection
-                    newPort = __createCompoentPort(x, targetCollection)
+                    newPort = __createCompoentPort(x, coll, mapping)
                     portCandidates[newPort.uuid] = newPort
                     mappedEx.target = newPort
                     mapping[(x._model.uuid, x.uuid)] = (newPort, False)
             else:
                 portCandidates[mappedEx.target.uuid] = mappedEx.target
     if postpone:
-        return False
+        if newPort is not None:
+            # if new port was created, record it in the mapping to avoid duplication
+            mapping[(x._model.uuid, x.uuid)] = (newPort, False)
+        return Postponed
 
-    if len(portCandidates.items()) > 1:
-        # potential intersected set case, go fault
-        LOGGER.fatal(
-            f"[{process.__qualname__}] Several port candidates detected, cannot proceed with merge. Function Port name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
-            x.name,
-            x.uuid,
-            destParent.name,
-            destParent.uuid,
-            x._model.name,
-            x._model.uuid,
-            extra={"ports": portCandidates}
-        )
-        exit(str(ExitCodes.MergeFault))
-    if len(portCandidates.items()) == 1:
-        port = list(portCandidates.values()).pop()
-        mappedPort = mapping.get((port._model.uuid, port.uuid))
-        if not mappedPort:
-            # coming here means that function was directly added into the model, not taken from the library
-            LOGGER.debug(
-                f"[{process.__qualname__}] Adding Function Port into model name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
-                x.name,
-                x.uuid,
-                destParent.name,
-                destParent.uuid,
-                x._model.name,
-                x._model.uuid,
-            )
-
-        mapping[(x._model.uuid, x.uuid)] = (port, False)
-    else:
+    if len(portCandidates) == 0:
         # port without exchanges
-        port = __findMatchingPort(x, targetCollection, destParent) # pyright: ignore[reportArgumentType] expect target collection has correct elements
+        port = __findMatchingPort(x, coll, destParent, False)
         if port is None:
-            port = __createCompoentPort(x, targetCollection)
+            port = __createCompoentPort(x, coll, mapping)
         mapping[(x._model.uuid, x.uuid)] = (port, False)
+        portCandidates[port.uuid] = port
 
-    return True
+    return list(portCandidates.values())

@@ -1,13 +1,20 @@
-from capellambse import helpers
+import sys
 
-from arcadiaMergeTool.helpers import ExitCodes
-from arcadiaMergeTool.merger.processors._processor import clone, doProcess, process
-from capellambse.metamodel import pa
 import capellambse.model as m
-from arcadiaMergeTool.merger.processors.recordMatch import recordMatch
-from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
-from arcadiaMergeTool.helpers.types import MergerElementMappingMap
+from capellambse import helpers
+from capellambse.metamodel import pa
+
 from arcadiaMergeTool import getLogger
+from arcadiaMergeTool.helpers import ExitCodes
+from arcadiaMergeTool.helpers.types import MergerElementMappingMap
+from arcadiaMergeTool.merger.processors._processor import (
+    Processed,
+    clone,
+    match,
+    process,
+)
+from arcadiaMergeTool.merger.processors.helpers import getDestParent
+from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
 LOGGER = getLogger(__name__)
 
@@ -15,8 +22,8 @@ LOGGER = getLogger(__name__)
 def _(
     x: pa.PhysicalArchitecture,
     dest: CapellaMergeModel,
-    src: CapellaMergeModel,
-    base: CapellaMergeModel,
+    _src: CapellaMergeModel,
+    _base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ) -> bool:
     LOGGER.debug(
@@ -32,14 +39,14 @@ def _(
         element = dest.model.pa
         mapping[(x._model.uuid, x.uuid)] = (element, False)
 
-    return True
+    return Processed
 
 @process.register
 def _(
     x: pa.PhysicalComponentPkg,
     dest: CapellaMergeModel,
-    src: CapellaMergeModel,
-    base: CapellaMergeModel,
+    _src: CapellaMergeModel,
+    _base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ) -> bool:
     LOGGER.debug(
@@ -55,12 +62,20 @@ def _(
         package = dest.model.pa.component_pkg
         mapping[(x._model.uuid, x.uuid)] = (package, False)
 
-    return True
+    return Processed
 
 T = pa.PhysicalFunctionPkg
 
+@match.register
+def _(x: T,
+    _destParent: m.ModelElement,
+    coll: m.ElementList[T],
+    _mapping: MergerElementMappingMap
+):
+    return list(filter(lambda y: y.name == x.name, coll))
+
 @clone.register
-def _ (srcEl: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
+def _ (srcEl: T, coll: m.ElementList[T], _mapping: MergerElementMappingMap):
     newComp = coll.create(helpers.xtype_of(srcEl._element),
         description = srcEl.description,
         is_visible_in_doc = srcEl.is_visible_in_doc,
@@ -69,14 +84,7 @@ def _ (srcEl: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
         review = srcEl.review,
         sid = srcEl.sid,
         summary = srcEl.summary,
-    ) 
-
-    # TODO: fix PVMT
-    # .applied_property_value_groups = []
-    # .applied_property_values = []
-    # .property_value_groups = []
-    # .property_values = []
-    # .pvmt = 
+    )
 
     if srcEl.status is not None:
         newComp.status = srcEl.status
@@ -86,64 +94,20 @@ def _ (srcEl: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
 @process.register
 def _(
     x: T,
-    dest: CapellaMergeModel,
-    src: CapellaMergeModel,
-    base: CapellaMergeModel,
+    _dest: CapellaMergeModel,
+    _src: CapellaMergeModel,
+    _base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
-) -> bool:
-    """Find and merge Function Packages
-
-    Parameters
-    ==========
-    x:
-        Function Package to process
-    dest:
-        Destination model to add Function Packages to
-    src:
-        Source model to take Function Packages from
-    base:
-        Base model to check Function Packages against
-    mapping:
-        Full mapping of the elements to the corresponding models
-
-    Returns
-    =======
-    True if element was completely processed, False otherwise
-    """
-    if mapping.get((x._model.uuid, x.uuid)) is not None:
-        return True
-
-    modelParent = x.parent
-    if not doProcess(modelParent, dest, src, base, mapping): # pyright: ignore[reportArgumentType] expect modelParent is of type ModelElement
-        # safeguard for direct call
-        return False
-
-    
-    destParentEntry = mapping.get((modelParent._model.uuid, modelParent.uuid)) # pyright: ignore[reportAttributeAccessIssue] expect ModelElement here with valid uuid
-    if destParentEntry is None:
-        LOGGER.fatal(f"[{process.__qualname__}] Element parent was not found in cache, name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
-            x.name,
-            x.uuid,
-            x.__class__,
-            modelParent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-            modelParent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-            modelParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
-        exit(str(ExitCodes.MergeFault))
-
-    (destParent, fromLibrary) = destParentEntry
-
+):
     targetCollection = None
 
+    destParent = getDestParent(x, mapping)
+
     if isinstance(destParent, pa.PhysicalArchitecture):
-        # HACK: use hardcoded property define a root function package
         mapping[(x._model.uuid, x.uuid)] = (destParent.function_pkg, False) # pyright: ignore[reportArgumentType] assume root function_pkg is always there
-        return True
-    elif (isinstance(destParent, T)
-            or isinstance(destParent, pa.PhysicalFunction)
-    ):
+        return Processed
+
+    if isinstance(destParent, (T, pa.PhysicalFunction)):
         targetCollection = destParent.packages
     else:
         LOGGER.fatal(
@@ -157,10 +121,6 @@ def _(
             x._model.name,
             x._model.uuid,
         )
-        exit(str(ExitCodes.MergeFault))
+        sys.exit(str(ExitCodes.MergeFault))
 
-    # use weak match by name
-    # TODO: implement strong match by PVMT properties
-    matchList = list(filter(lambda y: y.name == x.name, targetCollection))
-
-    return recordMatch(matchList, x, destParent, targetCollection, mapping)
+    return targetCollection

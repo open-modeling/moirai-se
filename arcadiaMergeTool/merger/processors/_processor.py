@@ -1,4 +1,5 @@
 import sys
+import typing as t
 from collections.abc import Callable
 from functools import singledispatch
 
@@ -11,15 +12,94 @@ from capellambse.model import ModelElement
 from arcadiaMergeTool import getLogger
 from arcadiaMergeTool.helpers import ExitCodes
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
+from arcadiaMergeTool.merger.processors.helpers import getDestParent
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
 LOGGER = getLogger(__name__)
 
+type ProcessedType = t.Literal[True]
+type PostponeType = t.Literal[False]
+type ContinueType = None
+
+Processed: ProcessedType = True
+Postponed: PostponeType = False
+Continue: ContinueType = None
+
 T = m.T_co
+ProcessReturnType = m.ElementList[T] | ProcessedType | PostponeType
+MatchReturnType = list[T] | ProcessedType | PostponeType
+DoProcessReturnType = ProcessedType | PostponeType
+
+type PreProcessReturnType = ProcessedType | PostponeType | ContinueType
 
 type GeneratorCallback = Callable[[T, m.ElementList[T], MergerElementMappingMap] , T]
 
-def recordMatch(matchColl: list[T], x: T, destParent: T, destColl: m.ElementList[T], mapping: MergerElementMappingMap) -> bool:
+@singledispatch
+def preprocess(_x: T,
+    _dest: CapellaMergeModel,
+    _src: CapellaMergeModel,
+    _base: CapellaMergeModel,
+    _mapping: MergerElementMappingMap
+) -> PreProcessReturnType:
+    """Default preprocessor.
+
+    Parameters
+    ----------
+    :param x: current element
+
+    Returns
+    -------
+    processing flag
+
+    Description
+    -----------
+    Preprocess method is optional method fo running safety checks against
+    existing element
+    """
+    return Continue # allow to proceed if not overloaded
+
+@singledispatch
+def clone (x: T,
+    _coll: m.ElementList[T],
+    _mapping: MergerElementMappingMap
+) -> T: ...
+
+@singledispatch
+def match (x: T,
+    destParent: m.ModelElement,
+    coll: m.ElementList[T],
+    mapping: MergerElementMappingMap
+) -> MatchReturnType: ...
+
+# generic function; will be extended across modules
+@singledispatch
+def process(x: T,
+    _dest: CapellaMergeModel,
+    _src: CapellaMergeModel,
+    _base: CapellaMergeModel,
+    _mapping: MergerElementMappingMap,
+) -> ProcessReturnType:
+    if isinstance(x, mm.capellacore.NamedElement):
+        LOGGER.warning(
+            f"[{process.__qualname__}] element processing skipped name [%s], class [%s], uuid [%s], model name [%s], uuid [%s]",  # noqa: G004
+            x.name,
+            x.__class__,
+            x.uuid,
+            x._model.name,
+            x._model.uuid,
+        )
+    else:
+        LOGGER.warning(
+            f"[{process.__qualname__}] element processing skipped class [%s], uuid [%s], model name [%s], uuid [%s]",  # noqa: G004
+            x.__class__,
+            x.uuid,
+            x._model.name,
+            x._model.uuid,
+        )
+    # default behavior for any ModelElement if no more specific overload is found
+    return Processed # mark elements processed by default
+
+def doRecord(matchColl: list[T], x: T, destParent: T, destColl: m.ElementList[T], mapping: MergerElementMappingMap):
     """Record match in cache or fail.
 
     Parameters
@@ -41,17 +121,31 @@ def recordMatch(matchColl: list[T], x: T, destParent: T, destColl: m.ElementList
     destEl = None
     fromLibrary = False
 
+    if len(matchColl) > 1:
+        # potentional conflict, raise the flag
+        LOGGER.fatal(
+            f"[{process.__qualname__}] Several port candidates detected, cannot proceed with merge. Physical Port name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]: [%s]",
+            x.name,
+            x.uuid,
+            destParent.name,
+            destParent.uuid,
+            x._model.name,
+            x._model.uuid,
+            matchColl
+        )
+        sys.exit(str(ExitCodes.MergeFault))
+
     if len(matchColl) > 0:
         # assume it's same to take first, but theme might be more
         destEl = matchColl[0]
 
-        mappedTargetPart = mapping.get((destEl._model.uuid, destEl.uuid))
-        fromLibrary = mappedTargetPart[1] if mappedTargetPart is not None else False
+        mappedEl = mapping.get((destEl._model.uuid, destEl.uuid))
+        fromLibrary = mappedEl[1] if mappedEl is not None else False
 
     else:
         if isinstance(x, mm.capellacore.NamedElement):
             LOGGER.debug(
-                f"[{recordMatch.__qualname__}] Create new model element name [%s], uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+                f"[{doRecord.__qualname__}] Create new model element name [%s], uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",  # noqa: G004
                 x.name,
                 x.uuid,
                 x.parent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
@@ -65,7 +159,7 @@ def recordMatch(matchColl: list[T], x: T, destParent: T, destColl: m.ElementList
             )
         else:
             LOGGER.debug(
-                f"[{recordMatch.__qualname__}] Create new model element uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+                f"[{doRecord.__qualname__}] Create new model element uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",  # noqa: G004
                 x.uuid,
                 x.parent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
                 x.parent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
@@ -80,50 +174,22 @@ def recordMatch(matchColl: list[T], x: T, destParent: T, destColl: m.ElementList
 
     mapping[(x._model.uuid, x.uuid)] = (destEl, fromLibrary)
 
-    return True
-
-
-@singledispatch
-def clone (x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap) -> T:
-    LOGGER.fatal(f"[{clone.__qualname__}] default generator called, must be overloaded")
-    sys.exit(str(ExitCodes.MergeFault))
-
-# generic function; will be extended across modules
-@singledispatch
-def process(
-    x: ModelElement,
-    dest: CapellaMergeModel,
-    src: CapellaMergeModel,
-    base: CapellaMergeModel,
-    mapping: MergerElementMappingMap,
-) -> bool:
-    LOGGER.warning(
-        f"[{process.__qualname__}] element processing skipped name [%s], class [%s], uuid [%s], model name [%s], uuid [%s]",
-        x.name,
-        x.__class__,
-        x.uuid,
-        x._model.name,
-        x._model.uuid,
-    )
-    # default behavior for any ModelElement if no more specific overload is found
-    return True  # mark elements processed by default
-
 def doProcess (
-    x: ModelElement,
+    x: ModelElement | None,
     dest: CapellaMergeModel,
     src: CapellaMergeModel,
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
-):
+) -> DoProcessReturnType:
     if x is None:
-        return True
+        return Processed
 
     cachedElement = mapping.get((x._model.uuid, x.uuid))
 
     if cachedElement is None:
         if isinstance(x, mm.capellacore.NamedElement):
             LOGGER.debug(
-                f"[{doProcess.__qualname__}] Add new element to model name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+                f"[{doProcess.__qualname__}] Add new element to model name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",  # noqa: G004
                 x.name,
                 x.uuid,
                 x.__class__,
@@ -132,100 +198,113 @@ def doProcess (
             )
         else:
             LOGGER.debug(
-                f"[{doProcess.__qualname__}] Add new element to model uuid [%s], class [%s], model name [%s], uuid [%s]",
+                f"[{doProcess.__qualname__}] Add new element to model uuid [%s], class [%s], model name [%s], uuid [%s]",  # noqa: G004
                 x.uuid,
                 x.__class__,
                 x._model.name,
                 x._model.uuid,
             )
 
+        if isinstance(x, mm.capellamodeller.Project):
+            # TODO: rework for common processing path
+            mapping[(x._model.uuid, x.uuid)] = (dest.model.project, True)
+            return Processed
+
         #######################################
         # PREPROCESSORS
         #######################################
 
-        if isinstance(x, mc.AbstractTypedElement) and x.type is not None:
-            # HACK: add pre-processors
-            if (x._model != src.model):
-                # assume it's safe to check model source to distinct "own" elements from imported
-                # as long as all libraries were linked earlier
-                mapping[(x._model.uuid, x.uuid)] = (x, True)
-            elif not doProcess(x.type, dest, src, base, mapping):
-                return False
+        if isinstance(x, m.ModelElement) and isinstance(x.parent, m.ModelElement):  # noqa: SIM102
+            # parent processing is a must to avoid cases when child lands to unprocessed element
+            if doProcess(x.parent, dest, src, base, mapping) == Postponed:
+                return Postponed
 
-        # if (isinstance(x, cc.CapellaElement)):
+        if isinstance(x, mc.AbstractTypedElement) and x.type is not None:  # noqa: SIM102
+            # hack for processing of typed elements types, they are not processed by matcher
+            if doProcess(x.type, dest, src, base, mapping) == Postponed:
+                return Postponed
 
-        #     for p in x.applied_property_values:
-        #         mappedPV = mapping.get((p._model.uuid, p.uuid))
-        #         if mappedPV is None:
-        #             return False
+        prep = preprocess(x, dest, src, base, mapping)
+        if prep == Postponed:
+            # for both cases - exit processing loop
+            return prep
 
-        #     for p in x.applied_property_value_groups:
-        #         mappedPVG = mapping.get((p._model.uuid, p.uuid))
-        #         if mappedPVG is None:
-        #             return False
         #######################################
         # PREPROCESSORS END
         #######################################
 
-        if not process(x, dest, src, base, mapping):
-            return False
+        # find correct collection to add element to
+        destColl = process(x, dest, src, base, mapping)
+
+        if destColl == Postponed:
+            return Postponed
+
+        if destColl != Processed:
+            # note, for already processed elements it's necessary to run post-processors
+
+            destParent = getDestParent(x, mapping)
+
+            # check for existing elements
+            matchColl = match(x, destParent, destColl, mapping)
+            if matchColl in (Processed, Postponed):
+                return matchColl
+
+            # complete record of element into destination model
+            doRecord(matchColl, x, destParent, destColl,mapping)
 
         #######################################
         # POSTROCESSORS
         #######################################
         mappedX = mapping.get((x._model.uuid, x.uuid)) # pyright: ignore[reportAssignmentType] expect correct element type in this position
-        if mappedX is not None:
-            mappedXEl = mappedX[0]
-            if x.__class__ != mappedXEl.__class__:
-                if isinstance(x, mm.capellacore.NamedElement):
-                    LOGGER.debug(
-                        f"[{doProcess.__qualname__}] Source and destination elements have different classifiers source name [%s], uuid [%s], class [%s], dest name [%s], uuid [%s], class [%s]",
-                        x.name,
-                        x.uuid,
-                        x.__class__,
-                        mappedXEl.name,
-                        mappedXEl.uuid,
-                        mappedXEl.__class__,
-                    )
-                else:
-                    LOGGER.debug(
-                        f"[{doProcess.__qualname__}] Source and destination elements have different classifiers source uuid [%s], class [%s], dest uuid [%s], class [%s]",
-                        x.uuid,
-                        x.__class__,
-                        mappedXEl.uuid,
-                        mappedXEl.__class__,
-                    )
+        if mappedX is None:
+            return Processed
 
-            # if isinstance(mappedXEl, mc.AbstractTypedElement) and x.type is not None:
-            #     # HACK: add post-processors
-            #     mappedXElType = mapping[(x.type._model.uuid, x.type.uuid)][0] 
-            #     mappedXEl.type = mappedXElType
+        mappedXEl = mappedX[0]
+        if x.__class__ != mappedXEl.__class__:
+            if isinstance(x, mm.capellacore.NamedElement):
+                LOGGER.debug(
+                    f"[{doProcess.__qualname__}] Source and destination elements have different classifiers source name [%s], uuid [%s], class [%s], dest name [%s], uuid [%s], class [%s]",  # noqa: G004
+                    x.name,
+                    x.uuid,
+                    x.__class__,
+                    mappedXEl.name if mappedXEl is not None else "NONE NAME",
+                    mappedXEl.uuid if mappedXEl is not None else "NONE UUID",
+                    mappedXEl.__class__ if mappedXEl is not None else "NONE CLASS",
+                )
+            else:
+                LOGGER.debug(
+                    f"[{doProcess.__qualname__}] Source and destination elements have different classifiers source uuid [%s], class [%s], dest uuid [%s], class [%s]",  # noqa: G004
+                    x.uuid,
+                    x.__class__,
+                    mappedXEl.uuid if mappedXEl is not None else "NONE UUID",
+                    mappedXEl.__class__  if mappedXEl is not None else "NONE CLASS",
+                )
 
-            if (isinstance(mappedXEl, cc.CapellaElement)):
+        if isinstance(x, mm.capellacore.CapellaElement) and x.status is not None:
+            # TODO: check statuses on other models to get lowest one
+            mappedXEl.status = x.status
 
-                for p in x.applied_property_values:
-                    if doProcess(p, dest, src, base, mapping):
-                        mappedXEl.applied_property_values.append(mapping[(p._model.uuid, p.uuid)][0])
-                    else:
-                        LOGGER.fatal(
-                            f"[{doProcess.__qualname__}] Component could not be resolved in post-processing name [%s], uuid [%s], class [%s]",
-                            p.name,
-                            p.uuid,
-                            p.__class__,
-                        )
-                        exit(str(ExitCodes.MergeFault))
+        if isinstance(mappedXEl, mc.AbstractTypedElement) and x.type is not None:
+            # TODO: implement as post-processor
+            mappedXElType = mapping[(x._model.uuid, x.type.uuid)][0]
+            mappedXEl.type = mappedXElType
 
-                for p in x.applied_property_value_groups:
-                    if doProcess(p, dest, src, base, mapping):
-                        mappedXEl.applied_property_value_groups.append(mapping[(p._model.uuid, p.uuid)][0])
-                    else:
-                        LOGGER.fatal(
-                            f"[{doProcess.__qualname__}] Component could not be resolved in post-processing name [%s], uuid [%s], class [%s]",
-                            p.name,
-                            p.uuid,
-                            p.__class__,
-                        )
-                        exit(str(ExitCodes.MergeFault))
+        if (isinstance(mappedXEl, cc.CapellaElement)):
+            for p in x.applied_property_values:
+                doProcess(p, dest, src, base, mapping)
+                v = mapping[(p._model.uuid, p.uuid)][0]
+                if len(mappedXEl.applied_property_values.filter(lambda y: y.uuid == v.uuid)) == 0:
+                    mappedXEl.applied_property_values.append(v)
+
+            for p in x.applied_property_value_groups:
+                doProcess(p, dest, src, base, mapping)
+                v = mapping[(p._model.uuid, p.uuid)][0]
+                if len(mappedXEl.applied_property_value_groups.filter(lambda y: y.uuid == v.uuid)) == 0:
+                    mappedXEl.applied_property_value_groups.append(v)
+
+        if isinstance(x, mm.capellacore.StringPropertyValue) and x.value == " 733583":
+            print("!!!!!!!!!!!!!!!!!!!!!!!!")
+            print(x)
 
         #######################################
         # POSTPROCESSORS END
@@ -244,11 +323,11 @@ def doProcess (
 
         if len(errors) > 0:
             LOGGER.warning(
-                f"[{doProcess.__qualname__}] Fields does not match recorded, element uuid [%s], model name [%s], uuid [%s], warnings [%s]",
+                f"[{doProcess.__qualname__}] Fields does not match recorded, element uuid [%s], model name [%s], uuid [%s], warnings [%s]",  # noqa: G004
                 x.uuid,
                 x._model.name,
                 x._model.uuid,
                 errors,
             )
 
-    return True
+    return Processed
