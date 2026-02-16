@@ -1,32 +1,33 @@
 from arcadiaMergeTool import getLogger
 
+from . import (
+    abstract,
+    capability,
+    catalog,
+    change_event,
+    component,
+    constraint,
+    context,
+    cs,
+    epbs,
+    fa,
+    function,
+    functional,
+    information,
+    interface,
+    la,
+    mission,
+    oa,
+    pa,
+    part,
+    physical,
+    port,
+    pvmt,
+    sa,
+    se,
+    statemachine,
+)
 from ._processor import doProcess
-from . import cs
-from . import epbs
-from . import fa
-from . import la
-from . import oa
-from . import pa
-from . import port
-from . import pvmt
-from . import sa
-from . import se
-from . import abstract
-from . import capability
-from . import catalog
-from . import change_event
-from . import component
-from . import constraint
-from . import context
-from . import function
-from . import functional
-from . import information
-from . import interface
-from . import mission
-from . import part
-from . import statemachine
-
-
 
 LOGGER = getLogger(__name__)
 
@@ -38,22 +39,23 @@ __all__ = [
     "component",
     "constraint",
     "context",
+    "cs",
+    "doProcess",
+    "epbs",
+    "fa",
     "function",
     "functional",
     "information",
     "interface",
-    "mission",
-    "part",
-    "statemachine",
-    "doProcess",
-    "cs",
-    "epbs",
-    "fa",
     "la",
+    "mission",
     "oa",
     "pa",
+    "part",
+    "physical",
     "port",
     "pvmt",
     "sa",
     "se",
+    "statemachine",
 ]

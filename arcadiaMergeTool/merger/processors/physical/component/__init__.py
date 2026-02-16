@@ -1,4 +1,4 @@
-"""Find and merge Components."""
+"""Find and merge Physical Components."""
 
 import sys
 
@@ -18,18 +18,9 @@ from arcadiaMergeTool.merger.processors._processor import (
 from arcadiaMergeTool.merger.processors.helpers import getDestParent
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
-from . import exchange, physical, port, realization
-
-__all__ = [
-    "exchange",
-    "physical",
-    "port",
-    "realization",
-]
-
 LOGGER = getLogger(__name__)
 
-T = mm.la.LogicalComponent | mm.sa.SystemComponent | mm.oa.Entity | mm.epbs.ConfigurationItem
+T = mm.pa.PhysicalComponent
 
 @clone.register
 def _(x: T, coll: m.ElementList[T], _mapping: MergerElementMappingMap): # pyright: ignore[reportInvalidTypeArguments]
@@ -40,7 +31,9 @@ def _(x: T, coll: m.ElementList[T], _mapping: MergerElementMappingMap): # pyrigh
         is_human = x.is_human,
         is_visible_in_doc = x.is_visible_in_doc,
         is_visible_in_lm = x.is_visible_in_lm,
+        kind = x.kind,
         name = x.name,
+        nature = x.nature,
         review = x.review,
         sid = x.sid,
         summary = x.summary,
@@ -58,19 +51,15 @@ def _(
 
     destParent = getDestParent(x, mapping)
 
-    if (isinstance(destParent, (mm.sa.SystemComponentPkg, mm.la.LogicalComponentPkg))
+    if (isinstance(destParent, (mm.pa.PhysicalComponentPkg))
         ) and x.parent.components[0] == x: # pyright: ignore[reportAttributeAccessIssue] expect components are there
         # map system to system and assume it's done
         mapping[(x._model.uuid, x.uuid)] = (destParent.components.filter(lambda y: not y.is_abstract and not y.is_actor and not y.is_human)[0], False)
         return Processed
-    if isinstance(destParent, mm.epbs.ConfigurationItemPkg) and x.parent.configuration_items[0] == x: # pyright: ignore[reportAttributeAccessIssue] expect configuration items are there
-        # map system to system and assume it's done
-        mapping[(x._model.uuid, x.uuid)] = (destParent.configuration_items.filter(lambda y: y.name == x.name)[0], False)
-        return Processed
-    if isinstance(destParent, (mm.cs.Component, mm.sa.SystemComponentPkg, mm.la.LogicalComponentPkg)):
+    if isinstance(destParent, mm.pa.PhysicalComponent):
+        targetCollection = destParent.owned_components # pyright: ignore[reportAttributeAccessIssue] owned_components is a valid property in this context
+    elif isinstance(destParent, (mm.pa.PhysicalComponentPkg)):
         targetCollection = destParent.components
-    elif isinstance(destParent, mm.epbs.ConfigurationItemPkg):
-        targetCollection = destParent.configuration_items
     else:
         LOGGER.fatal(
             f"[{process.__qualname__}] Component parent is not a valid parent, Component name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",

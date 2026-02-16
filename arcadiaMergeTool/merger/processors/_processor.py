@@ -123,16 +123,31 @@ def doRecord(matchColl: list[T], x: T, destParent: T, destColl: m.ElementList[T]
 
     if len(matchColl) > 1:
         # potentional conflict, raise the flag
-        LOGGER.fatal(
-            f"[{process.__qualname__}] Several port candidates detected, cannot proceed with merge. Physical Port name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]: [%s]",
-            x.name,
-            x.uuid,
-            destParent.name,
-            destParent.uuid,
-            x._model.name,
-            x._model.uuid,
-            matchColl
-        )
+        if isinstance(x, mm.capellacore.NamedElement):
+            LOGGER.fatal(
+                f"[{process.__qualname__}] Several candidates detected, cannot proceed with merge. Element name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]: [%s]",
+                x.name,
+                x.uuid,
+                x.__class__,
+                destParent.name,
+                destParent.uuid,
+                x._model.name,
+                x._model.uuid,
+                matchColl,
+                stack_info=True
+            )
+        else:
+            LOGGER.fatal(
+                f"[{process.__qualname__}] Several candidates detected, cannot proceed with merge. Element uuid [%s], class [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]: [%s]",
+                x.uuid,
+                x.__class__,
+                destParent.name,
+                destParent.uuid,
+                x._model.name,
+                x._model.uuid,
+                matchColl,
+                stack_info=True
+            )
         sys.exit(str(ExitCodes.MergeFault))
 
     if len(matchColl) > 0:
@@ -301,10 +316,6 @@ def doProcess (
                 v = mapping[(p._model.uuid, p.uuid)][0]
                 if len(mappedXEl.applied_property_value_groups.filter(lambda y: y.uuid == v.uuid)) == 0:
                     mappedXEl.applied_property_value_groups.append(v)
-
-        if isinstance(x, mm.capellacore.StringPropertyValue) and x.value == " 733583":
-            print("!!!!!!!!!!!!!!!!!!!!!!!!")
-            print(x)
 
         #######################################
         # POSTPROCESSORS END
