@@ -87,10 +87,11 @@ Contributions are welcome.
 
 # Roadmap
 
+* [x] Implement PVMT Merge
 * [ ] Implement Behaviour merge
 * [ ] Implement Requirements merge
 * [ ] Implement PVMT based merge
-* [ ] Implement Diagmams transition
+* [ ] Implement Diagrams merge
 * [ ] Implement generation of the overview diagrams
 * [ ] Implement validation
 * [ ] Add support for the interfaces based on cross-model REC/RPL entities
