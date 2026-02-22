@@ -1,13 +1,11 @@
-import sys
-
 import capellambse.model as m
 from capellambse import helpers
 from capellambse.metamodel import pa
 
 from arcadiaMergeTool import getLogger
-from arcadiaMergeTool.helpers import ExitCodes
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool.merger.processors._processor import (
+    Fault,
     Processed,
     clone,
     match,
@@ -25,7 +23,7 @@ def _(
     _src: CapellaMergeModel,
     _base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
-) -> bool:
+):
     LOGGER.debug(
         f"[{process.__qualname__}] create root entry for [%s], class [%s], uuid [%s], model name [%s], uuid [%s]",
         x.name,
@@ -48,7 +46,7 @@ def _(
     _src: CapellaMergeModel,
     _base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
-) -> bool:
+):
     LOGGER.debug(
         f"[{process.__qualname__}] create root entry for package [%s], class [%s], uuid [%s], model name [%s], uuid [%s]",
         x.name,
@@ -110,17 +108,6 @@ def _(
     if isinstance(destParent, (T, pa.PhysicalFunction)):
         targetCollection = destParent.packages
     else:
-        LOGGER.fatal(
-            f"[{process.__qualname__}] Invalid parent, elemment name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
-            x.name,
-            x.uuid,
-            x.__class__,
-            destParent.name,
-            destParent.uuid,
-            destParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
-        sys.exit(str(ExitCodes.MergeFault))
+        return Fault
 
     return targetCollection

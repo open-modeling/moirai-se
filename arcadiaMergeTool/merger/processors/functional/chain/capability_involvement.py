@@ -1,18 +1,19 @@
 """Find and merge Functional Chain Involvement Function."""
 
-import sys
-
 import capellambse.metamodel as mm
 import capellambse.model as m
 from capellambse import helpers
 
 from arcadiaMergeTool import getLogger
-from arcadiaMergeTool.helpers import ExitCodes
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool.merger.processors._processor import (
+    Continue,
+    Fault,
     Postponed,
     clone,
+    doProcess,
     match,
+    preprocess,
     process,
 )
 from arcadiaMergeTool.merger.processors.helpers import getDestParent
@@ -25,8 +26,7 @@ T =  mm.sa.interaction.FunctionalChainAbstractCapabilityInvolvement
 @clone.register
 def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
     return coll.create(helpers.xtype_of(x._element),
-        source = mapping.get((x._model.uuid, x.source.uuid))[0], # pyright: ignore[reportOptionalMemberAccess, reportOptionalSubscript] expect source is already there
-        target = mapping.get((x._model.uuid, x.target.uuid))[0], # pyright: ignore[reportOptionalMemberAccess, reportOptionalSubscript] expect target is already there
+        involved = mapping.get((x._model.uuid, x.involved.uuid))[0], # pyright: ignore[reportOptionalMemberAccess, reportOptionalSubscript] expect target is already there
         description = x.description,
         is_visible_in_doc = x.is_visible_in_doc,
         is_visible_in_lm = x.is_visible_in_lm,
@@ -34,6 +34,17 @@ def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
         sid = x.sid,
         summary = x.summary,
     )
+
+@preprocess.register
+def _(x: T,
+    dest: CapellaMergeModel,
+    src: CapellaMergeModel,
+    base: CapellaMergeModel,
+    mapping: MergerElementMappingMap
+):
+    if doProcess(x.involved, dest, src, base, mapping) == Postponed: # pyright: ignore[reportArgumentType] expect source exists
+        return Postponed
+    return Continue
 
 @process.register
 def _(
@@ -50,18 +61,10 @@ def _(
     if (isinstance(destParent, mm.fa.FunctionalChain)
     ):
         targetCollection = destParent.involvements
+    elif isinstance(destParent, (mm.la.CapabilityRealization, mm.sa.Capability)):
+        targetCollection = destParent.chain_involvements
     else:
-        LOGGER.fatal(
-            f"[{process.__qualname__}] Functional Exchange Realization parent is not a valid parent, Functional Exchange Realization uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
-            x.uuid,
-            x.__class__,
-            destParent.name,
-            destParent.uuid,
-            destParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
-        sys.exit(str(ExitCodes.MergeFault))
+        return Fault
 
     return targetCollection
 
@@ -71,10 +74,10 @@ def _(x: T,
     coll: m.ElementList[T],
     mapping: MergerElementMappingMap
 ):
-    mappedSource = mapping.get((x._model.uuid, x.source.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect source is already there
-    mappedTarget = mapping.get((x._model.uuid, x.target.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect target is already there
+    mappedSource = mapping.get((x._model.uuid, x.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue] expect parent has uuid
+    mappedTarget = mapping.get((x._model.uuid, x.involved.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect involved is already there
     if mappedSource is None or mappedTarget is None:
         # if source or target is not mapped, postpone allocation processing
         return Postponed
 
-    return list(filter(lambda y: y.source == mappedSource[0] and y.target == mappedTarget[0], coll)) # pyright: ignore[reportOptionalSubscript] check for none is above, mappedSource and mappedTarget are safe
+    return list(filter(lambda y: y.parent == mappedSource[0] and y.involved == mappedTarget[0], coll))

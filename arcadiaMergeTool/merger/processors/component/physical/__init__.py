@@ -1,8 +1,6 @@
 from arcadiaMergeTool import getLogger
-from . import link
 
-from . import artifact, port
-
+from . import artifact, link, port
 
 LOGGER = getLogger(__name__)
 

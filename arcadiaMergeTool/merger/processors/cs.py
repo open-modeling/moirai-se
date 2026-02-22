@@ -1,13 +1,11 @@
-import sys
-
 import capellambse.model as m
 from capellambse import helpers
 from capellambse.metamodel import cs
 
 from arcadiaMergeTool import getLogger
-from arcadiaMergeTool.helpers import ExitCodes
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool.merger.processors._processor import (
+    Fault,
     Processed,
     clone,
     match,
@@ -70,16 +68,6 @@ def _(
     if isinstance(destParent, T):
         targetCollection = destParent.packages
     else:
-        LOGGER.fatal(
-            f"[{process.__qualname__}] Architecture Realization parent is not a valid parent, Port uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
-            x.uuid,
-            x.__class__,
-            destParent.name,
-            destParent.uuid,
-            destParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
-        sys.exit(str(ExitCodes.MergeFault))
+        return Fault
 
     return targetCollection

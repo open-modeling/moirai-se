@@ -9,17 +9,15 @@ Exchange checks if either
 In both cases - iterate through the exchanges and match them by name
 """
 
-import sys
-
 import capellambse.metamodel as mm
 import capellambse.model as m
 from capellambse import helpers
 
 from arcadiaMergeTool import getLogger
-from arcadiaMergeTool.helpers import ExitCodes
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool.merger.processors._processor import (
     Continue,
+    Fault,
     Postponed,
     clone,
     match,
@@ -140,17 +138,6 @@ def _(
     ):
         targetCollection = destParent.component_exchanges # pyright: ignore[reportAttributeAccessIssue] expect ports are already there
     else:
-        LOGGER.fatal(
-            f"[{process.__qualname__}] Component exchange parent is not a valid parent, Component exchange name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
-            x.name,
-            x.uuid,
-            x.__class__,
-            destParent.name,
-            destParent.uuid,
-            destParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
-        sys.exit(str(ExitCodes.MergeFault))
+        return Fault
 
     return targetCollection

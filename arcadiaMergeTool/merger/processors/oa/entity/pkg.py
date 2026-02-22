@@ -1,8 +1,6 @@
-"""Find and merge Capability Packages."""
-
 import capellambse.model as m
 from capellambse import helpers
-from capellambse.metamodel import sa
+from capellambse.metamodel import oa
 
 from arcadiaMergeTool import getLogger
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
@@ -18,7 +16,17 @@ from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
 LOGGER = getLogger(__name__)
 
-T = sa.CapabilityPkg
+T = oa.EntityPkg
+
+@match.register
+def _(x: T,
+    _destParent: m.ModelElement,
+    coll: m.ElementList[T],
+    _mapping: MergerElementMappingMap
+):
+    # use weak match by name
+    # TODO: implement strong match by PVMT properties
+    return list(filter(lambda y: y.name == x.name, coll))
 
 @clone.register
 def _ (x: T, coll: m.ElementList[T], _mapping: MergerElementMappingMap):
@@ -32,6 +40,7 @@ def _ (x: T, coll: m.ElementList[T], _mapping: MergerElementMappingMap):
         summary = x.summary,
     )
 
+
 @process.register
 def _(
     x: T,
@@ -40,26 +49,16 @@ def _(
     _base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ):
-    targetCollection = None
+    destParent = getDestParent(x, mapping);
 
-    destParent = getDestParent(x, mapping)
-
-    if isinstance(destParent, sa.SystemAnalysis):
-        mapping[(x._model.uuid, x.uuid)] = (destParent.capability_pkg, False) # pyright: ignore[reportArgumentType] expect data package is there and valid
+    if isinstance(destParent, oa.OperationalAnalysis):
+        package = destParent.interface_pkg
+        mapping[(x._model.uuid, x.uuid)] = (package, False)  # pyright: ignore[reportArgumentType] expect package is correct
         return Processed
+
     if isinstance(destParent, T):
         targetCollection = destParent.packages
     else:
         return Fault
 
     return targetCollection
-
-@match.register
-def _(x: T,
-    _destParent: m.ModelElement,
-    coll: m.ElementList[T],
-    _mapping: MergerElementMappingMap
-):
-    # use weak match by name
-    # TODO: implement strong match by PVMT properties
-    return list(filter(lambda y: y.name == x.name, coll))

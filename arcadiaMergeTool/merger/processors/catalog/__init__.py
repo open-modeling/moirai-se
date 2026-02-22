@@ -1,16 +1,14 @@
 """Find and merge Catalog Element Link."""
 
-import sys
-
 import capellambse.model as m
 from capellambse import helpers
 from capellambse.metamodel import re
 
 from arcadiaMergeTool import getLogger
-from arcadiaMergeTool.helpers import ExitCodes
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool.merger.processors._processor import (
     Continue,
+    Fault,
     Postponed,
     clone,
     doProcess,
@@ -71,18 +69,7 @@ def _(
     ):
         targetCollection = destParent.links
     else:
-        LOGGER.fatal(
-            f"[{process.__qualname__}] Catalog Element Link parent is not a valid parent, Catalog Element Link name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
-            x.name,
-            x.uuid,
-            x.__class__,
-            destParent.name,
-            destParent.uuid,
-            destParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
-        sys.exit(str(ExitCodes.MergeFault))
+        return Fault
 
     return targetCollection
 

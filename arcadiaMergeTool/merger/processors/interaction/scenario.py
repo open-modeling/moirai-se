@@ -1,14 +1,13 @@
-"""Find and merge Capability Packages."""
+"""Find and merge Scenario."""
 
+import capellambse.metamodel as mm
 import capellambse.model as m
 from capellambse import helpers
-from capellambse.metamodel import sa
 
 from arcadiaMergeTool import getLogger
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool.merger.processors._processor import (
     Fault,
-    Processed,
     clone,
     match,
     process,
@@ -18,19 +17,28 @@ from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
 LOGGER = getLogger(__name__)
 
-T = sa.CapabilityPkg
+T = mm.interaction.Scenario
 
 @clone.register
-def _ (x: T, coll: m.ElementList[T], _mapping: MergerElementMappingMap):
-    return coll.create(helpers.xtype_of(x._element),
+def _(x: T, coll: m.ElementList[T], _mapping: MergerElementMappingMap):
+    newComp = coll.create(helpers.xtype_of(x._element),
         description = x.description,
+        is_control_operator = x.is_control_operator,
+        is_merged = x.is_merged,
         is_visible_in_doc = x.is_visible_in_doc,
         is_visible_in_lm = x.is_visible_in_lm,
+        kind = x.kind,
         name = x.name,
         review = x.review,
         sid = x.sid,
         summary = x.summary,
     )
+    if x.postcondition is not None:
+        newComp.postcondition = x.postcondition
+    if x.precondition is not None:
+        newComp.precondition = x.precondition
+
+    return newComp
 
 @process.register
 def _(
@@ -44,11 +52,8 @@ def _(
 
     destParent = getDestParent(x, mapping)
 
-    if isinstance(destParent, sa.SystemAnalysis):
-        mapping[(x._model.uuid, x.uuid)] = (destParent.capability_pkg, False) # pyright: ignore[reportArgumentType] expect data package is there and valid
-        return Processed
-    if isinstance(destParent, T):
-        targetCollection = destParent.packages
+    if isinstance(destParent, (mm.sa.Capability, mm.la.CapabilityRealization)):
+        targetCollection = destParent.scenarios
     else:
         return Fault
 

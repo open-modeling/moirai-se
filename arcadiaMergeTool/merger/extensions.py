@@ -1,9 +1,10 @@
-import capellambse.metamodel as mm
+import sys
 
-from arcadiaMergeTool.helpers import ExitCodes
-import capellambse.metamodel.re as re
+import capellambse.metamodel as mm
+from capellambse.metamodel import re
 
 from arcadiaMergeTool import getLogger
+from arcadiaMergeTool.helpers import ExitCodes
 from arcadiaMergeTool.helpers.constants import REC_CATALOG_NAME
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
@@ -16,11 +17,10 @@ def mergeExtensions(
     src: list[CapellaMergeModel],
     elementsMappingMap: MergerElementMappingMap,
 ):
-    """Merge all extensions into the target model
+    """Merge all extensions into the target model.
 
     Parameters
-    ==========
-
+    ----------
     param dest
         Target model
     param
@@ -29,7 +29,7 @@ def mergeExtensions(
         src List of the
 
     Description
-    ===========
+    -----------
     Method collects all references extensions into the target model.
     At present only REC Catalog / RPL elements are considered
 
@@ -146,7 +146,7 @@ def mergeExtensions(
             model.model.name,
             model.model.uuid,
         )
-    
+
         prj: mm.capellamodeller.Project = model.model.project
         extensions = prj.model_root.extensions
         for ext in extensions:

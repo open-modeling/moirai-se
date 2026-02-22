@@ -1,14 +1,12 @@
-import sys
-
 import capellambse.metamodel as mm
 import capellambse.model as m
 from capellambse import helpers
 from capellambse.metamodel import capellamodeller as ca
 
 from arcadiaMergeTool import getLogger
-from arcadiaMergeTool.helpers import ExitCodes
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool.merger.processors._processor import (
+    Fault,
     Postponed,
     Processed,
     clone,
@@ -27,7 +25,7 @@ def _(
     _src: CapellaMergeModel,
     _base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
-) -> bool:
+):
     LOGGER.debug(
         f"[{process.__qualname__}] create root entry for package [%s], class [%s], uuid [%s], model name [%s], uuid [%s]",
         x.name,
@@ -53,7 +51,7 @@ def _(
     _src: CapellaMergeModel,
     _base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
-) -> bool:
+):
     LOGGER.debug(
         f"[{process.__qualname__}] create root entry for package [%s], class [%s], uuid [%s], model name [%s], uuid [%s]",
         x.name,
@@ -109,17 +107,7 @@ def _(
     elif isinstance(destParent, mm.sa.SystemAnalysis):
         targetCollection = destParent.operational_analysis_realizations
     else:
-        LOGGER.fatal(
-            f"[{process.__qualname__}] Architecture Realization parent is not a valid parent, Port uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
-            x.uuid,
-            x.__class__,
-            destParent.name,
-            destParent.uuid,
-            destParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
-        sys.exit(str(ExitCodes.MergeFault))
+        return Fault
 
     return targetCollection
 

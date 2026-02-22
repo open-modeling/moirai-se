@@ -1,5 +1,6 @@
-from . import capability
+from . import capability, function
 
 __all__ = [
     "capability",
+    "function"
 ]

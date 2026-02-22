@@ -2,20 +2,20 @@ import os
 
 from arcadiaMergeTool import getLogger
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
+from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
+from arcadiaMergeTool.models.config_model import ConfigModel
 from arcadiaMergeTool.models.config_project_model import ConfigProjectModel
 from arcadiaMergeTool.models.merger_config_model import MergerConfigModel
-from arcadiaMergeTool.models.config_model import ConfigModel
-from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
 from .elements import mergeElements
 from .extensions import mergeExtensions
 from .libraries import mergeLibraries
 
 __all__ = [
-    "mergeExtensions",
+    "merge",
     "mergeElements",
-    "mergeLibraries",
-    "merge"
+    "mergeExtensions",
+    "mergeLibraries"
 ]
 
 LOGGER = getLogger(__name__)

@@ -1,10 +1,15 @@
-import capellambse.model as m
 from capellambse.metamodel import oa
 
 from arcadiaMergeTool import getLogger
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool.merger.processors._processor import Processed, process
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
+
+from . import entity
+
+__all__ = [
+    "entity",
+]
 
 LOGGER = getLogger(__name__)
 
@@ -17,7 +22,7 @@ def _(
     _src: CapellaMergeModel,
     _base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
-) -> bool:
+):
     LOGGER.debug(
         f"[{process.__qualname__}] create root entry for package [%s], class [%s], uuid [%s], model name [%s], uuid [%s]",
         x.name,

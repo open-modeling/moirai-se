@@ -3,6 +3,7 @@ from arcadiaMergeTool import getLogger
 from . import (
     abstract,
     capability,
+    capellacommon,
     catalog,
     change_event,
     component,
@@ -14,6 +15,7 @@ from . import (
     function,
     functional,
     information,
+    interaction,
     interface,
     la,
     mission,
@@ -34,6 +36,7 @@ LOGGER = getLogger(__name__)
 __all__ = [
     "abstract",
     "capability",
+    "capellacommon",
     "catalog",
     "change_event",
     "component",
@@ -46,6 +49,7 @@ __all__ = [
     "function",
     "functional",
     "information",
+    "interaction",
     "interface",
     "la",
     "mission",

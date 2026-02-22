@@ -1,16 +1,17 @@
-"""Find and merge Functional Exchange Allocations."""
-
-import capellambse.metamodel as mm
+import capellambse.metamodel.capellacommon as cc
 import capellambse.model as m
 from capellambse import helpers
+from capellambse.metamodel import cs, fa
 
 from arcadiaMergeTool import getLogger
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool.merger.processors._processor import (
+    Continue,
     Fault,
     Postponed,
     clone,
     match,
+    preprocess,
     process,
 )
 from arcadiaMergeTool.merger.processors.helpers import getDestParent
@@ -18,7 +19,7 @@ from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
 LOGGER = getLogger(__name__)
 
-T = mm.fa.ComponentExchangeFunctionalExchangeAllocation
+T = cc.TransfoLink
 
 @clone.register
 def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
@@ -33,6 +34,21 @@ def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
         summary = x.summary,
     )
 
+@preprocess.register
+def _(x: T,
+    _dest: CapellaMergeModel,
+    _src: CapellaMergeModel,
+    _base: CapellaMergeModel,
+    mapping: MergerElementMappingMap
+):
+    sourceComponentMap = mapping.get((x._model.uuid, x.source.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect source exists in this context
+    targetComponentMap = mapping.get((x._model.uuid, x.target.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect target exists in this context
+
+    if sourceComponentMap is None or targetComponentMap is None:
+        # Fast fail, postpone exchange processing to component existence
+        return Postponed
+    return Continue
+
 @process.register
 def _(
     x: T,
@@ -45,9 +61,9 @@ def _(
 
     destParent = getDestParent(x, mapping)
 
-    if (isinstance(destParent, (mm.fa.ComponentExchange, mm.cs.PhysicalLink))
+    if (isinstance(destParent, (cs.Component, fa.AbstractFunction, cs.ComponentPkg, fa.FunctionPkg, cs.Interface))
     ):
-        targetCollection = destParent.functional_exchange_allocations
+        targetCollection = destParent.owned_traces
     else:
         return Fault
 

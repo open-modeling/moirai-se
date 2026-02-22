@@ -1,6 +1,6 @@
 from arcadiaMergeTool import getLogger
-from . import link
 
+from . import link
 
 LOGGER = getLogger(__name__)
 

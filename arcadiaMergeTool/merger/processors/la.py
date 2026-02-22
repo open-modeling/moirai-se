@@ -1,4 +1,3 @@
-import capellambse.model as m
 from capellambse.metamodel import la
 
 from arcadiaMergeTool import getLogger
@@ -17,7 +16,7 @@ def _(
     _src: CapellaMergeModel,
     _base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
-) -> bool:
+):
     LOGGER.debug(
         f"[{process.__qualname__}] processing logical component package [%s], class [%s], uuid [%s], model name [%s], uuid [%s]",
         x.name,

@@ -1,13 +1,13 @@
-import sys
+"""Find and merge AbstractCapabilityRealization."""
 
 import capellambse.metamodel as mm
 import capellambse.model as m
 from capellambse import helpers
 
 from arcadiaMergeTool import getLogger
-from arcadiaMergeTool.helpers import ExitCodes
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool.merger.processors._processor import (
+    Fault,
     Postponed,
     clone,
     match,
@@ -52,17 +52,7 @@ def _(
     if isinstance(destParent, mm.la.CapabilityRealization):
         targetCollection = destParent.capability_realizations
     else:
-        LOGGER.fatal(
-            f"[{process.__qualname__}] Abstract Capability Realization parent is not a valid parent, Abstract Capability uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
-            x.uuid,
-            x.__class__,
-            destParent.name,
-            destParent.uuid,
-            destParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
-        sys.exit(str(ExitCodes.MergeFault))
+        return Fault
 
     return targetCollection
 

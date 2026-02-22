@@ -1,4 +1,3 @@
-import sys
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
@@ -42,7 +41,7 @@ def create_element(model: MelodyModel, parent, source: ModelElement_co) -> Model
     # hacks to remove keys of the foreign attributes
     attrib = {}
     for k, i in el.attrib.items():
-        if k in ["id", "appliedPropertyValues", "appliedPropertyValueGroups", "abstractType"]:
+        if k in ["id", "appliedPropertyValues", "appliedPropertyValueGroups", "abstractType", "referencedValue", "referencedProperty"]:
             continue
         attrib[k] = i
 

@@ -28,6 +28,8 @@ def _makeModelElementList(
     ----------
     model:
         Source model to fetch all data from
+    clsname:
+        Type to use as an element hit
 
     Returns
     -------
@@ -46,8 +48,8 @@ def _makeModelElementList(
     )
     if clsname is not None:
         return deque(filter(lambda x: isinstance(x, clsname), lst))
-    else:
-        return lst
+
+    return lst
 
 def mergeElements(
     dest: CapellaMergeModel,

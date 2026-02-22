@@ -1,28 +1,21 @@
 """Find and merge Property Value Packages."""
 
-import sys
-
 import capellambse.metamodel.capellacore as cc
 import capellambse.metamodel.capellamodeller as cm
 import capellambse.model as m
 from capellambse import helpers
 
 from arcadiaMergeTool import getLogger
-from arcadiaMergeTool.helpers import ExitCodes
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool.merger.processors._processor import (
+    Fault,
+    Processed,
     clone,
     match,
     process,
 )
 from arcadiaMergeTool.merger.processors.helpers import getDestParent
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
-
-from . import value_groups
-
-__all__ = [
-    "value_groups",
-]
 
 LOGGER = getLogger(__name__)
 
@@ -52,22 +45,13 @@ def _(
 
     destParent = getDestParent(x, mapping)
 
-    if (isinstance(destParent, (cm.Project, cc.PropertyValuePkg))
-    ):
+    if isinstance(destParent, cm.Project):
+        mapping[(x._model.uuid, x.uuid)] = (destParent._model.pvmt, True)
+        return Processed
+    if isinstance(destParent, cc.PropertyValuePkg):
         targetCollection = destParent.property_value_pkgs
     else:
-        LOGGER.fatal(
-            f"[{process.__qualname__}] Property Value Packages parent is not a valid parent, Property Value Packages name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
-            x.name,
-            x.uuid,
-            x.__class__,
-            destParent.name,
-            destParent.uuid,
-            destParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
-        sys.exit(str(ExitCodes.MergeFault))
+        return Fault
 
     return targetCollection
 

@@ -1,7 +1,5 @@
 """Find and merge Enumeration Literal Values."""
 
-import sys
-
 import capellambse.metamodel.information as inf
 import capellambse.metamodel.information.datatype as dt
 import capellambse.metamodel.information.datavalue as dv
@@ -9,9 +7,10 @@ import capellambse.model as m
 from capellambse import helpers
 
 from arcadiaMergeTool import getLogger
-from arcadiaMergeTool.helpers import ExitCodes, create_element
+from arcadiaMergeTool.helpers import create_element
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool.merger.processors._processor import (
+    Fault,
     Processed,
     clone,
     match,
@@ -78,18 +77,7 @@ def _(
         mapping[(x._model.uuid, x.uuid)] = (el, False)
         return Processed
     else:
-        LOGGER.fatal(
-            f"[{process.__qualname__}] Literal Values parent is not a valid parent, Literal Values name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
-            x.name,
-            x.uuid,
-            x.__class__,
-            destParent.name,
-            destParent.uuid,
-            destParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
-        sys.exit(str(ExitCodes.MergeFault))
+        return Fault
 
     return targetCollection
 

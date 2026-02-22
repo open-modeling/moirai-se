@@ -1,16 +1,15 @@
 """Find and merge Numeric References."""
 
-import sys
-
 import capellambse.metamodel.information as inf
 import capellambse.metamodel.information.datavalue as dv
 import capellambse.model as m
 
 from arcadiaMergeTool import getLogger
-from arcadiaMergeTool.helpers import ExitCodes, create_element
+from arcadiaMergeTool.helpers import create_element
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool.merger.processors._processor import (
     Continue,
+    Fault,
     Postponed,
     Processed,
     doProcess,
@@ -31,6 +30,8 @@ def _(x: T,
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap
 ):
+    if doProcess(x.value, dest, src, base, mapping) == Postponed: # pyright: ignore[reportArgumentType] expect source exists
+        return Postponed
     if doProcess(x.property, dest, src, base, mapping) == Postponed: # pyright: ignore[reportArgumentType] expect source exists
         return Postponed
     if doProcess(x.unit, dest, src, base, mapping) == Postponed: # pyright: ignore[reportArgumentType] expect source exists
@@ -61,23 +62,16 @@ def _(
         el.summary = x.summary
 
         if x.property is not None:
-            el.property = x.property
+            mappedType = mapping[(x._model.uuid, x.property.uuid)]
+            el.property = mappedType[0]
         if x.unit is not None:
             mappedType = mapping[(x._model.uuid, x.unit.uuid)]
             el.unit = mappedType[0]
+        if x.value is not None:
+            mappedType = mapping[(x._model.uuid, x.value.uuid)]
+            el.value = mappedType[0]
     else:
-        LOGGER.fatal(
-            f"[{process.__qualname__}] Numeric References parent is not a valid parent, Numeric References name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
-            x.name,
-            x.uuid,
-            x.__class__,
-            destParent.name,
-            destParent.uuid,
-            destParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
-        sys.exit(str(ExitCodes.MergeFault))
+        return Fault
 
     mapping[(x._model.uuid, x.uuid)] = (el, False)
 

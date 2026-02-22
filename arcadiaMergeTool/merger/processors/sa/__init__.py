@@ -36,7 +36,7 @@ def _(
     _src: CapellaMergeModel,
     _base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
-) -> bool:
+):
     LOGGER.debug(
         f"[{process.__qualname__}] create root entry for package [%s], class [%s], uuid [%s], model name [%s], uuid [%s]",
         x.name,

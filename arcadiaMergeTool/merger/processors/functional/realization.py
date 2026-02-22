@@ -1,15 +1,13 @@
 """Find and merge Functional Exchange Realizations."""
 
-import sys
-
 import capellambse.metamodel as mm
 import capellambse.model as m
 from capellambse import helpers
 
 from arcadiaMergeTool import getLogger
-from arcadiaMergeTool.helpers import ExitCodes
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool.merger.processors._processor import (
+    Fault,
     Postponed,
     clone,
     match,
@@ -51,17 +49,7 @@ def _(
     ):
         targetCollection = destParent.functional_exchange_realizations
     else:
-        LOGGER.fatal(
-            f"[{process.__qualname__}] Functional Exchange Realization parent is not a valid parent, Functional Exchange Realization uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
-            x.uuid,
-            x.__class__,
-            destParent.name,
-            destParent.uuid,
-            destParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
-        sys.exit(str(ExitCodes.MergeFault))
+        return Fault
 
     return targetCollection
 

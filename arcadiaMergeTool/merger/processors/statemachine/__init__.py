@@ -1,15 +1,13 @@
 """Find and merge StateMachines."""
 
-import sys
-
 import capellambse.metamodel as mm
 import capellambse.model as m
 from capellambse import helpers
 
 from arcadiaMergeTool import getLogger
-from arcadiaMergeTool.helpers import ExitCodes
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool.merger.processors._processor import (
+    Fault,
     clone,
     match,
     process,
@@ -24,7 +22,7 @@ T = mm.capellacommon.StateMachine
 @clone.register
 def _(x: T, coll: m.ElementList[T], _mapping: MergerElementMappingMap):
 
-    newComp = coll.create(helpers.xtype_of(x._element),
+    return coll.create(helpers.xtype_of(x._element),
         description = x.description,
         is_control_operator = x.is_control_operator,
         is_visible_in_doc = x.is_visible_in_doc,
@@ -33,12 +31,7 @@ def _(x: T, coll: m.ElementList[T], _mapping: MergerElementMappingMap):
         review = x.review,
         sid = x.sid,
         summary = x.summary,
-    ) 
-
-    if x.status is not None:
-        newComp.status = x.status
-
-    return newComp
+    )
 
 @process.register
 def _(
@@ -55,18 +48,7 @@ def _(
     if (isinstance(destParent, mm.cs.Block)):
         targetCollection = destParent.state_machines
     else:
-        LOGGER.fatal(
-            f"[{process.__qualname__}] StateMachine parent is not a valid parent, StateMachine name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
-            x.name,
-            x.uuid,
-            x.__class__,
-            destParent.name,
-            destParent.uuid,
-            destParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
-        sys.exit(str(ExitCodes.MergeFault))
+        return Fault
 
     return targetCollection
 

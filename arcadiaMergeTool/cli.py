@@ -1,19 +1,16 @@
-"""
-JSON to ReqIF Converter - cli
-"""
+"""JSON to ReqIF Converter - cli."""
 
-import json
 import sys
 
 import pydantic
 
-from arcadiaMergeTool import logger
 from arcadiaMergeTool.helpers import ExitCodes, loadOrExit
-from arcadiaMergeTool.models.config_model import ConfigModel
 from arcadiaMergeTool.merger import merge
+from arcadiaMergeTool.models.config_model import ConfigModel
+
 
 def cli():
-    """Main entry point"""
+    """Main entry point."""
 
     if len(sys.argv) < 1:
         print("Usage: python capellaMergeTool <config.json>")
@@ -28,7 +25,7 @@ def cli():
         config = pydantic.TypeAdapter(ConfigModel).validate_python(loadOrExit(json_path,   "Input"))
 
         merge(config)
-        
+
         return ExitCodes.OK
 
     except Exception as e:

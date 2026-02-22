@@ -1,6 +1,7 @@
 import sys
 import typing as t
 from collections.abc import Callable
+from enum import Enum
 from functools import singledispatch
 
 import capellambse.metamodel as mm
@@ -17,16 +18,24 @@ from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
 LOGGER = getLogger(__name__)
 
-type ProcessedType = t.Literal[True]
-type PostponeType = t.Literal[False]
-type ContinueType = None
+class ProcessingResult(Enum):
+    Processed = 1
+    Postponed = 2
+    Continue = 3
+    Fault = 4
 
-Processed: ProcessedType = True
-Postponed: PostponeType = False
-Continue: ContinueType = None
+type ProcessedType = t.Literal[ProcessingResult.Processed]
+type PostponeType = t.Literal[ProcessingResult.Postponed]
+type ContinueType = t.Literal[ProcessingResult.Continue]
+type FaultType = t.Literal[ProcessingResult.Fault]
+
+Processed: ProcessedType = ProcessingResult.Processed
+Postponed: PostponeType = ProcessingResult.Postponed
+Continue: ContinueType = ProcessingResult.Continue
+Fault: FaultType = ProcessingResult.Fault
 
 T = m.T_co
-ProcessReturnType = m.ElementList[T] | ProcessedType | PostponeType
+ProcessReturnType = m.ElementList[T] | ProcessedType | PostponeType | FaultType
 MatchReturnType = list[T] | ProcessedType | PostponeType
 DoProcessReturnType = ProcessedType | PostponeType
 
@@ -110,6 +119,8 @@ def doRecord(matchColl: list[T], x: T, destParent: T, destColl: m.ElementList[T]
         Source element to make cache key from
     destParent:
         Potential parent element
+    destColl:
+        Collection of Elements to add element to
     mapping:
         Cache to put element in
 
@@ -253,6 +264,30 @@ def doProcess (
 
         if destColl == Postponed:
             return Postponed
+
+        if destColl == Fault:
+            if isinstance(x, mm.capellacore.NamedElement):
+                LOGGER.fatal(f"[{getDestParent.__qualname__}] Element parent cannot be found, name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
+                    x.name,
+                    x.uuid,
+                    x.__class__,
+                    x.parent.name, # pyright: ignore[reportAttributeAccessIssue] expext parent is ModelElement
+                    x.parent.uuid, # pyright: ignore[reportAttributeAccessIssue] expext parent is ModelElement
+                    x.parent.__class__,
+                    x._model.name,
+                    x._model.uuid,
+                )
+            else:
+                LOGGER.fatal(f"[{getDestParent.__qualname__}] Element parent cannot be found, uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
+                    x.uuid,
+                    x.__class__,
+                    x.parent.name, # pyright: ignore[reportAttributeAccessIssue] expext parent is ModelElement
+                    x.parent.uuid, # pyright: ignore[reportAttributeAccessIssue] expext parent is ModelElement
+                    x.parent.__class__,
+                    x._model.name,
+                    x._model.uuid,
+                )
+            sys.exit(str(ExitCodes.MergeFault))
 
         if destColl != Processed:
             # note, for already processed elements it's necessary to run post-processors

@@ -17,16 +17,14 @@ For disjoint set of exchanges - current port is the main port, mark port and exc
 For intersected set - merge fault, do not try to guess, request explicit model update
 """
 
-import sys
-
 import capellambse.metamodel as mm
 import capellambse.model as m
 from capellambse import helpers
 
 from arcadiaMergeTool import getLogger
-from arcadiaMergeTool.helpers import ExitCodes
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool.merger.processors._processor import (
+    Fault,
     Postponed,
     clone,
     match,
@@ -126,30 +124,9 @@ def _(
         elif isinstance(x, mm.fa.FunctionOutputPort):
             targetCollection = destParent.outputs
         else:
-            LOGGER.fatal(f"[{process.__qualname__}] Unknown Function Port type, name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s] model name [%s], uuid [%s]",
-                x.name,
-                x.uuid,
-                x.__class__,
-                destParent.name, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-                destParent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
-                destParent.__class__,
-                x._model.name,
-                x._model.uuid,
-            )
-            sys.exit(str(ExitCodes.MergeFault))
+            return Fault
     else:
-        LOGGER.fatal(
-            f"[{process.__qualname__}] Function Port parent is not a valid parent, Function Port name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
-            x.name,
-            x.uuid,
-            x.__class__,
-            destParent.name,
-            destParent.uuid,
-            destParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
-        sys.exit(str(ExitCodes.MergeFault))
+        return Fault
 
     return targetCollection
 

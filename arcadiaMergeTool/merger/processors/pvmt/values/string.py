@@ -1,16 +1,14 @@
 """Find and merge String Property Values."""
 
-import sys
-
 import capellambse.metamodel as mm
 import capellambse.metamodel.capellacore as cc
 import capellambse.model as m
 from capellambse import helpers
 
 from arcadiaMergeTool import getLogger
-from arcadiaMergeTool.helpers import ExitCodes
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool.merger.processors._processor import (
+    Fault,
     clone,
     match,
     process,
@@ -52,18 +50,7 @@ def _(
     ):
         targetCollection = destParent.property_values
     else:
-        LOGGER.fatal(
-            f"[{process.__qualname__}] Property Value Groups parent is not a valid parent, Property Value Groups name [%s], uuid [%s], class [%s], parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
-            x.name,
-            x.uuid,
-            x.__class__,
-            destParent.name,
-            destParent.uuid,
-            destParent.__class__,
-            x._model.name,
-            x._model.uuid,
-        )
-        sys.exit(str(ExitCodes.MergeFault))
+        return Fault
 
     return targetCollection
 

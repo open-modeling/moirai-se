@@ -1,20 +1,21 @@
-import capellambse
-
 from pathlib import PurePosixPath
-from arcadiaMergeTool import getLogger
-from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
+
+import capellambse
 from capellambse.metamodel.libraries import LibraryReference
 from capellambse.model import ModelElement
+
+from arcadiaMergeTool import getLogger
+from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
 LOGGER = getLogger(name=__name__)
 
 def mergeLibraries(
     dest: CapellaMergeModel, base: CapellaMergeModel, src: list[CapellaMergeModel]
 ):
-    """Collect Libraries into destination model
+    """Collect Libraries into destination model.
 
     Parameters
-    ==========
+    ----------
     dest:
         Target model to add libraries to
     base:
@@ -23,7 +24,7 @@ def mergeLibraries(
         Source models to take other libraries from
 
     Description
-    ===========
+    -----------
     Collect libraries into the first reference of destination model.
     Assume destination model has only first and empty set of referwnces
 
