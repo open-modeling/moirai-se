@@ -18,7 +18,7 @@ from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
 LOGGER = getLogger(__name__)
 
-T = oa.EntityPkg
+T = oa.RolePkg
 
 @match.register
 def _(x: T,

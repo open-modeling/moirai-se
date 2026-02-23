@@ -5,10 +5,11 @@ from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool.merger.processors._processor import Processed, process
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
-from . import entity
+from . import entity, role
 
 __all__ = [
     "entity",
+    "role",
 ]
 
 LOGGER = getLogger(__name__)

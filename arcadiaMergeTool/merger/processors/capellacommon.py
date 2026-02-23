@@ -1,7 +1,7 @@
 import capellambse.metamodel.capellacommon as cc
 import capellambse.model as m
 from capellambse import helpers
-from capellambse.metamodel import cs, fa
+from capellambse.metamodel import cs, fa, interaction
 
 from arcadiaMergeTool import getLogger
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
@@ -61,7 +61,7 @@ def _(
 
     destParent = getDestParent(x, mapping)
 
-    if (isinstance(destParent, (cs.Component, fa.AbstractFunction, cs.ComponentPkg, fa.FunctionPkg, cs.Interface))
+    if (isinstance(destParent, (cs.Component, fa.AbstractFunction, cs.ComponentPkg, fa.FunctionPkg, cs.Interface, interaction.Scenario))
     ):
         targetCollection = destParent.owned_traces
     else:

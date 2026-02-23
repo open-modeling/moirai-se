@@ -1,14 +1,13 @@
-"""Find and merge RolePkg."""
+"""Find and merge ExecutionEvent."""
 
+import capellambse.metamodel as mm
 import capellambse.model as m
 from capellambse import helpers
-from capellambse.metamodel import oa
 
 from arcadiaMergeTool import getLogger
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool.merger.processors._processor import (
     Fault,
-    Processed,
     clone,
     match,
     process,
@@ -18,20 +17,10 @@ from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
 LOGGER = getLogger(__name__)
 
-T = oa.EntityPkg
-
-@match.register
-def _(x: T,
-    _destParent: m.ModelElement,
-    coll: m.ElementList[T],
-    _mapping: MergerElementMappingMap
-):
-    # use weak match by name
-    # TODO: implement strong match by PVMT properties
-    return list(filter(lambda y: y.name == x.name, coll))
+T = mm.interaction.ExecutionEvent
 
 @clone.register
-def _ (x: T, coll: m.ElementList[T], _mapping: MergerElementMappingMap):
+def _(x: T, coll: m.ElementList[T], _mapping: MergerElementMappingMap):
     return coll.create(helpers.xtype_of(x._element),
         description = x.description,
         is_visible_in_doc = x.is_visible_in_doc,
@@ -42,7 +31,6 @@ def _ (x: T, coll: m.ElementList[T], _mapping: MergerElementMappingMap):
         summary = x.summary,
     )
 
-
 @process.register
 def _(
     x: T,
@@ -51,16 +39,23 @@ def _(
     _base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ):
-    destParent = getDestParent(x, mapping);
+    targetCollection = None
 
-    if isinstance(destParent, oa.OperationalAnalysis):
-        package = destParent.interface_pkg
-        mapping[(x._model.uuid, x.uuid)] = (package, False)  # pyright: ignore[reportArgumentType] expect package is correct
-        return Processed
+    destParent = getDestParent(x, mapping)
 
-    if isinstance(destParent, T):
-        targetCollection = destParent.packages
+    if isinstance(destParent, (mm.interaction.Scenario)):
+        targetCollection = destParent.events
     else:
         return Fault
 
     return targetCollection
+
+@match.register
+def _(x: T,
+    _destParent: m.ModelElement,
+    coll: m.ElementList[T],
+    _mapping: MergerElementMappingMap
+):
+    # use weak match by name
+    # TODO: implement strong match by PVMT properties
+    return list(filter(lambda y: y.name == x.name, coll))
