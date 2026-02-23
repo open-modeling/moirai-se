@@ -88,8 +88,8 @@ Contributions are welcome.
 # Roadmap
 
 * [x] Implement PVMT Merge
-* [ ] Implement Behaviour merge
-* [ ] Implement Requirements merge
+* [x] Implement Behaviour merge
+* [x] Implement Requirements merge
 * [ ] Implement PVMT based merge
 * [ ] Implement Diagrams merge
 * [ ] Implement generation of the overview diagrams
