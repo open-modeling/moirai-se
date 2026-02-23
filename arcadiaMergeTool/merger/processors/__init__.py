@@ -1,9 +1,9 @@
 from arcadiaMergeTool import getLogger
 
 from . import (
-    abstract,
     capability,
     capellacommon,
+    capellacore,
     catalog,
     change_event,
     component,
@@ -34,9 +34,9 @@ from ._processor import doProcess
 LOGGER = getLogger(__name__)
 
 __all__ = [
-    "abstract",
     "capability",
     "capellacommon",
+    "capellacore",
     "catalog",
     "change_event",
     "component",

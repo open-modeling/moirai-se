@@ -1,10 +1,9 @@
 from arcadiaMergeTool import getLogger
 
-from . import boolean, enum, float, int, string
+from . import boolean, float, int, string
 
 __all__ = [
     "boolean",
-    "enum",
     "float",
     "int",
     "string",

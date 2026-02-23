@@ -63,7 +63,7 @@ def _(
 
     if (isinstance(destParent, (cs.Component, fa.AbstractFunction, cs.ComponentPkg, fa.FunctionPkg, cs.Interface, interaction.Scenario))
     ):
-        targetCollection = destParent.owned_traces
+        targetCollection = destParent.owned_traces # pyright: ignore[reportAttributeAccessIssue] expect it's correct type
     else:
         return Fault
 

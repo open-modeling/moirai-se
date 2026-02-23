@@ -1,6 +1,9 @@
 """Find and merge Enum Property Valuea."""
 
+import sys
+
 import capellambse.metamodel.capellacore as cc
+import capellambse.metamodel.capellamodeller as cm
 import capellambse.model as m
 from capellambse import helpers
 
@@ -17,22 +20,19 @@ from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
 LOGGER = getLogger(__name__)
 
-T = cc.EnumerationPropertyValue
+T = cc.KeyValue
 
 @clone.register
 def _(x: T, coll: m.ElementList[T], _mapping: MergerElementMappingMap):
-    print(11111)
-    print(x)
-    sys.exit()
-
     return coll.create(helpers.xtype_of(x._element),
         description = x.description,
         is_visible_in_doc = x.is_visible_in_doc,
         is_visible_in_lm = x.is_visible_in_lm,
-        name = x.name,
+        key = x.key,
         review = x.review,
         sid = x.sid,
         summary = x.summary,
+        value = x.value,
     )
 
 @process.register
@@ -47,9 +47,9 @@ def _(
 
     destParent = getDestParent(x, mapping)
 
-    if (isinstance(destParent, (cc.PropertyValueGroup, cc.PropertyValuePkg))
+    if (isinstance(destParent, (cm.Project))
     ):
-        targetCollection = destParent.property_values
+        targetCollection = destParent.key_value_pairs
     else:
         return Fault
 
@@ -61,6 +61,4 @@ def _(x: T,
     coll: m.ElementList[T],
     _mapping: MergerElementMappingMap
 ):
-    # use weak match by name
-    # TODO: implement strong match by PVMT properties
-    return list(filter(lambda y: y.name == x.name, coll))
+    return list(filter(lambda y: y.key == x.key, coll))
