@@ -1,7 +1,7 @@
 import capellambse.metamodel.capellacommon as cc
 import capellambse.model as m
 from capellambse import helpers
-from capellambse.metamodel import cs, fa, interaction
+from capellambse.metamodel import cs, fa, la, sa, interaction
 
 from arcadiaMergeTool import getLogger
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
@@ -61,7 +61,7 @@ def _(
 
     destParent = getDestParent(x, mapping)
 
-    if (isinstance(destParent, (cs.Component, fa.AbstractFunction, cs.ComponentPkg, fa.FunctionPkg, cs.Interface, interaction.Scenario))
+    if (isinstance(destParent, (cs.Component, fa.AbstractFunction, cs.ComponentPkg, fa.FunctionPkg, cs.Interface, interaction.Scenario, la.CapabilityRealization, sa.Capability))
     ):
         targetCollection = destParent.owned_traces # pyright: ignore[reportAttributeAccessIssue] expect it's correct type
     else:

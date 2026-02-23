@@ -88,8 +88,7 @@ def _(
 
     if isinstance(destParent, (dt.Enumeration, dt.BooleanType, dt.NumericType, dt.StringType)):
         targetCollection = destParent.data_values
-    elif (isinstance(destParent, (dv.BinaryExpression, inf.ExchangeItemElement))
-    ):
+    elif (isinstance(destParent, (dv.BinaryExpression, inf.ExchangeItemElement))):
         el =create_element(dest.model, destParent, x)
 
         el.description = x.description
@@ -119,6 +118,4 @@ def _(x: T,
     coll: m.ElementList[T],
     _mapping: MergerElementMappingMap
 ):
-    # use weak match by name
-    # TODO: implement strong match by PVMT properties
-    return list(filter(lambda y: y.name == x.name, coll))
+    return list(filter(lambda y: y._element.tag == x._element.tag and y.value == x.value, coll))

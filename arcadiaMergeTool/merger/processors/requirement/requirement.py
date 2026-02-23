@@ -1,8 +1,9 @@
-"""Find and merge EventSentOperation."""
+"""Find and merge Requirement."""
 
-import capellambse.metamodel as mm
 import capellambse.model as m
 from capellambse import helpers
+from capellambse.extensions.reqif import capellarequirements as cr
+from capellambse.extensions.reqif import requirements as r
 
 from arcadiaMergeTool import getLogger
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
@@ -21,22 +22,26 @@ from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
 LOGGER = getLogger(__name__)
 
-T = mm.interaction.EventSentOperation
+T = r.Requirement
 
 @clone.register
-def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
+def _ (x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
     newComp = coll.create(helpers.xtype_of(x._element),
+        chapter_name = x.chapter_name,
         description = x.description,
-        is_visible_in_doc = x.is_visible_in_doc,
-        is_visible_in_lm = x.is_visible_in_lm,
+        foreign_id = x.foreign_id,
+        identifier = x.identifier,
+        long_name = x.long_name,
         name = x.name,
-        review = x.review,
+        prefix = x.prefix,
+        requirement_type_proxy = x.requirement_type_proxy,
         sid = x.sid,
-        summary = x.summary,
+        text = x.text,
     )
-    if x.operation is not None:
-        mappedType = mapping[(x._model.uuid, x.operation.uuid)]
-        newComp.operation = mappedType[0]
+
+    if x.type is not None:
+        mappedType = mapping[(x._model.uuid, x.type.uuid)]
+        newComp.type = mappedType[0]
 
     return newComp
 
@@ -47,7 +52,7 @@ def _(x: T,
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap
 ):
-    if doProcess(x.operation, dest, src, base, mapping) == Postponed: # pyright: ignore[reportArgumentType] expect source exists
+    if doProcess(x.type, dest, src, base, mapping) == Postponed:
         return Postponed
     return Continue
 
@@ -59,12 +64,10 @@ def _(
     _base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ):
-    targetCollection = None
-
     destParent = getDestParent(x, mapping)
 
-    if isinstance(destParent, (mm.interaction.Scenario)):
-        targetCollection = destParent.events
+    if isinstance(destParent, cr.CapellaModule):
+        targetCollection = destParent.requirements
     else:
         return Fault
 
@@ -74,9 +77,8 @@ def _(
 def _(x: T,
     _destParent: m.ModelElement,
     coll: m.ElementList[T],
-    mapping: MergerElementMappingMap
+    _mapping: MergerElementMappingMap
 ):
-    mappedOp = mapping.get((x._model.uuid, x.operation.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect operation is there
     # use weak match by name
     # TODO: implement strong match by PVMT properties
-    return list(filter(lambda y: y.name == x.name and isinstance(y, T) and y.operation == mappedOp, coll))
+    return list(filter(lambda y: y.long_name == x.long_name, coll))

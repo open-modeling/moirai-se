@@ -74,8 +74,9 @@ def _(
 def _(x: T,
     _destParent: m.ModelElement,
     coll: m.ElementList[T],
-    _mapping: MergerElementMappingMap
+    mapping: MergerElementMappingMap
 ):
+    mappedOp = mapping.get((x._model.uuid, x.operation.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect operation is there
     # use weak match by name
     # TODO: implement strong match by PVMT properties
-    return list(filter(lambda y: y.name == x.name, coll))
+    return list(filter(lambda y: y.name == x.name and isinstance(y, T) and y.operation == mappedOp, coll))

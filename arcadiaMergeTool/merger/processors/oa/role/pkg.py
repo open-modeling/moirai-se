@@ -42,7 +42,6 @@ def _ (x: T, coll: m.ElementList[T], _mapping: MergerElementMappingMap):
         summary = x.summary,
     )
 
-
 @process.register
 def _(
     x: T,
@@ -54,11 +53,11 @@ def _(
     destParent = getDestParent(x, mapping);
 
     if isinstance(destParent, oa.OperationalAnalysis):
-        package = destParent.interface_pkg
-        mapping[(x._model.uuid, x.uuid)] = (package, False)  # pyright: ignore[reportArgumentType] expect package is correct
-        return Processed
-
-    if isinstance(destParent, T):
+        # package = destParent.role_pkg
+        # mapping[(x._model.uuid, x.uuid)] = (package, False)  # pyright: ignore[reportArgumentType] expect package is correct
+        # return Processed
+        targetCollection = destParent.role_pkg
+    elif isinstance(destParent, T):
         targetCollection = destParent.packages
     else:
         return Fault

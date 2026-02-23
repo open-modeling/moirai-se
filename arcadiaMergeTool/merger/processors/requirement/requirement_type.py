@@ -1,8 +1,9 @@
-"""Find and merge StateMachines."""
+"""Find and merge RequirementType."""
 
-import capellambse.metamodel as mm
 import capellambse.model as m
 from capellambse import helpers
+from capellambse.extensions.reqif import capellarequirements as cr
+from capellambse.extensions.reqif import requirements as r
 
 from arcadiaMergeTool import getLogger
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
@@ -15,28 +16,17 @@ from arcadiaMergeTool.merger.processors._processor import (
 from arcadiaMergeTool.merger.processors.helpers import getDestParent
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
-from . import region
-
-__all__ = [
-    "region"
-]
-
 LOGGER = getLogger(__name__)
 
-T = mm.capellacommon.StateMachine
+T = r.RequirementType
 
 @clone.register
-def _(x: T, coll: m.ElementList[T], _mapping: MergerElementMappingMap):
-
+def _ (x: T, coll: m.ElementList[T], _mapping: MergerElementMappingMap):
     return coll.create(helpers.xtype_of(x._element),
         description = x.description,
-        is_control_operator = x.is_control_operator,
-        is_visible_in_doc = x.is_visible_in_doc,
-        is_visible_in_lm = x.is_visible_in_lm,
-        name = x.name,
-        review = x.review,
+        identifier = x.identifier,
+        long_name = x.long_name,
         sid = x.sid,
-        summary = x.summary,
     )
 
 @process.register
@@ -47,12 +37,10 @@ def _(
     _base: CapellaMergeModel,
     mapping: MergerElementMappingMap,
 ):
-    targetCollection = None
-
     destParent = getDestParent(x, mapping)
 
-    if (isinstance(destParent, mm.cs.Block)):
-        targetCollection = destParent.state_machines
+    if isinstance(destParent, cr.CapellaTypesFolder):
+        targetCollection = destParent.types
     else:
         return Fault
 
@@ -66,4 +54,4 @@ def _(x: T,
 ):
     # use weak match by name
     # TODO: implement strong match by PVMT properties
-    return list(filter(lambda y: y.name == x.name, coll))
+    return list(filter(lambda y: y.long_name == x.long_name, coll))

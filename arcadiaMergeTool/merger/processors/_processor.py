@@ -183,7 +183,7 @@ def doRecord(matchColl: list[T], x: T, destParent: T, destColl: m.ElementList[T]
                 x._model.name,
                 x._model.uuid,
             )
-        else:
+        elif isinstance(destParent, mm.capellacore.NamedElement):
             LOGGER.debug(
                 f"[{doRecord.__qualname__}] Create new model element uuid [%s], parent name [%s], uuid [%s], class [%s], dest parent name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",  # noqa: G004
                 x.uuid,
@@ -196,6 +196,18 @@ def doRecord(matchColl: list[T], x: T, destParent: T, destColl: m.ElementList[T]
                 x._model.name,
                 x._model.uuid,
             )
+        else:
+            LOGGER.debug(
+                f"[{doRecord.__qualname__}] Create new model element uuid [%s], parent uuid [%s], class [%s], dest parent, uuid [%s], class [%s], model name [%s], uuid [%s]",  # noqa: G004
+                x.uuid,
+                x.parent.uuid, # pyright: ignore[reportAttributeAccessIssue] expect parent is already there
+                x.parent.__class__,
+                destParent.uuid,
+                destParent.__class__,
+                x._model.name,
+                x._model.uuid,
+            )
+
         destEl = clone(x, destColl, mapping)
 
     mapping[(x._model.uuid, x.uuid)] = (destEl, fromLibrary)
@@ -312,7 +324,7 @@ def doProcess (
         mappedXEl = mappedX[0]
         if x.__class__ != mappedXEl.__class__:
             if isinstance(x, mm.capellacore.NamedElement):
-                LOGGER.debug(
+                LOGGER.warning(
                     f"[{doProcess.__qualname__}] Source and destination elements have different classifiers source name [%s], uuid [%s], class [%s], dest name [%s], uuid [%s], class [%s]",  # noqa: G004
                     x.name,
                     x.uuid,
@@ -322,7 +334,7 @@ def doProcess (
                     mappedXEl.__class__ if mappedXEl is not None else "NONE CLASS",
                 )
             else:
-                LOGGER.debug(
+                LOGGER.warning(
                     f"[{doProcess.__qualname__}] Source and destination elements have different classifiers source uuid [%s], class [%s], dest uuid [%s], class [%s]",  # noqa: G004
                     x.uuid,
                     x.__class__,
