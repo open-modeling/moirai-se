@@ -7,10 +7,13 @@ from capellambse import helpers
 from arcadiaMergeTool import getLogger
 from arcadiaMergeTool.helpers.types import MergerElementMappingMap
 from arcadiaMergeTool.merger.processors._processor import (
+    Continue,
     Fault,
     Postponed,
     clone,
+    doProcess,
     match,
+    preprocess,
     process,
 )
 from arcadiaMergeTool.merger.processors.helpers import getDestParent
@@ -32,6 +35,21 @@ def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
         sid = x.sid,
         summary = x.summary,
     )
+
+
+@preprocess.register
+def _(x: T,
+    dest: CapellaMergeModel,
+    src: CapellaMergeModel,
+    base: CapellaMergeModel,
+    mapping: MergerElementMappingMap
+):
+    if doProcess(x.source, dest, src, base, mapping) == Postponed:
+        return Postponed
+    if doProcess(x.target, dest, src, base, mapping) == Postponed:
+        return Postponed
+    return Continue
+
 
 @process.register
 def _(
@@ -65,4 +83,21 @@ def _(x: T,
         # if source or target is not mapped, postpone allocation processing
         return Postponed
 
-    return list(filter(lambda y: y.source == mappedSource[0] and y.target == mappedTarget[0], coll)) # pyright: ignore[reportOptionalSubscript] check for none is above, mappedSource and mappedTarget are safe
+    lst = list(filter(lambda y: y.source == mappedSource[0] and y.target == mappedTarget[0], coll)) # pyright: ignore[reportOptionalSubscript] check for none is above, mappedSource and mappedTarget are safe
+
+    LOGGER.debug("[%s] Component matches, uuid [%s], class [%s], source name [%s], uuid [%s], class [%s], target name [%s], uuid [%s], class [%s], model name [%s], uuid [%s], list [%s]",
+        match.__qualname__,
+        x.uuid,
+        x.__class__,
+        x.source.name, # pyright: ignore[reportOptionalMemberAccess]
+        x.source.uuid, # pyright: ignore[reportOptionalMemberAccess]
+        x.source.__class__,
+        x.target.name, # pyright: ignore[reportOptionalMemberAccess]
+        x.target.uuid, # pyright: ignore[reportOptionalMemberAccess]
+        x.target.__class__,
+        x._model.name,
+        x._model.uuid,
+        lst
+    )
+
+    return lst

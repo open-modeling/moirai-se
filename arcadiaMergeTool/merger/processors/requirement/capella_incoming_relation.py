@@ -11,6 +11,7 @@ from arcadiaMergeTool.merger.processors._processor import (
     Continue,
     Fault,
     Postponed,
+    Processed,
     clone,
     doProcess,
     match,
@@ -26,26 +27,16 @@ T = cr.CapellaIncomingRelation
 
 @clone.register
 def _ (x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
-    newComp = coll.create(helpers.xtype_of(x._element),
+    return coll.create(helpers.xtype_of(x._element),
         description = x.description,
         identifier = x.identifier,
         long_name = x.long_name,
         relation_type_proxy = x.relation_type_proxy,
         sid = x.sid,
-        target = mapping[(x._model.uuid, x.target.uuid)][0] if x.target is not None else None
+        source = mapping[(x._model.uuid, x.source.uuid)][0] if x.source is not None else None,
+        target = mapping[(x._model.uuid, x.target.uuid)][0] if x.target is not None else None,
+        type = mapping[(x._model.uuid, x.type.uuid)][0] if x.type is not None else None
     )
-
-    if x.source is not None:
-        mappedType = mapping[(x._model.uuid, x.source.uuid)]
-        newComp.source = mappedType[0]
-    if x.target is not None:
-        mappedType = mapping[(x._model.uuid, x.target.uuid)]
-        newComp.target = mappedType[0]
-    if x.type is not None:
-        mappedType = mapping[(x._model.uuid, x.type.uuid)]
-        newComp.type = mappedType[0]
-
-    return newComp
 
 @preprocess.register
 def _(x: T,
@@ -54,6 +45,19 @@ def _(x: T,
     base: CapellaMergeModel,
     mapping: MergerElementMappingMap
 ):
+    if x.source is None or x.target is None:
+        LOGGER.warning("[%s] Skip processing of the Capella Incoming Relation, source is [%s], target is [%s], ends can't be None, element name [%s], uuid [%s], class [%s], model name [%s], uuid [%s]",
+            preprocess.__qualname__,
+            "None" if x.source is None else x.source.uuid,
+            "None" if x.target is None else x.target.uuid,
+            x.long_name,
+            x.uuid,
+            x.__class__,
+            x._model.name,
+            x._model.uuid
+        )
+        return Processed
+
     if doProcess(x.source, dest, src, base, mapping) == Postponed:
         return Postponed
     if doProcess(x.target, dest, src, base, mapping) == Postponed:
@@ -88,7 +92,8 @@ def _(x: T,
     mappedSource = mapping.get((x._model.uuid, x.source.uuid)) # pyright: ignore[reportOptionalMemberAccess] expect source is already there
     mappedTarget = mapping.get((x._model.uuid, x.target.uuid)) if x.target is not None else (None)
     mappedType= mapping.get((x._model.uuid, x.type.uuid)) if x.type is not None else (None)
-    if mappedSource is None or mappedTarget is None:
+
+    if (x.source is not None and mappedSource is None) or (x.target is not None and mappedTarget is None) or (x.type is not None and mappedType is None):
         # if source or target is not mapped, postpone allocation processing
         return Postponed
 

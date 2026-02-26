@@ -41,8 +41,6 @@ DoProcessReturnType = ProcessedType | PostponeType
 
 type PreProcessReturnType = ProcessedType | PostponeType | ContinueType
 
-type GeneratorCallback = Callable[[T, m.ElementList[T], MergerElementMappingMap] , T]
-
 @singledispatch
 def preprocess(_x: T,
     _dest: CapellaMergeModel,
@@ -263,7 +261,7 @@ def doProcess (
                 return Postponed
 
         prep = preprocess(x, dest, src, base, mapping)
-        if prep == Postponed:
+        if prep in (Postponed, Processed):
             # for both cases - exit processing loop
             return prep
 

@@ -9,6 +9,8 @@ Exchange checks if either
 In both cases - iterate through the exchanges and match them by name
 """
 
+import sys
+
 import capellambse.metamodel as mm
 import capellambse.model as m
 from capellambse import helpers
@@ -89,6 +91,8 @@ def _(x: T,
 
 @clone.register
 def _(x: T, coll: m.ElementList[T], _mapping: MergerElementMappingMap):
+    print(x)
+    sys.exit()
     # NOTE: do not assign ports, port assignment logic is in function/port
     # if sourceFunctionPortMap is not None:
     #     newComp.source = sourceFunctionPortMap # pyright: ignore[reportAttributeAccessIssue] expect source exists on model  # noqa: ERA001
@@ -96,23 +100,14 @@ def _(x: T, coll: m.ElementList[T], _mapping: MergerElementMappingMap):
     #     newComp.target = targetFunctionPortMap # pyright: ignore[reportAttributeAccessIssue] expect source exists on model  # noqa: ERA001
     newComp = coll.create(helpers.xtype_of(x._element),
         description = x.description,
-        is_multicast = x.is_multicast,
-        is_multireceive = x.is_multireceive,
         is_visible_in_doc = x.is_visible_in_doc,
         is_visible_in_lm = x.is_visible_in_lm,
         name = x.name,
-        rate = x.rate,
-        rate_kind = x.rate_kind,
         review = x.review,
         sid = x.sid,
         summary = x.summary,
-        weight = x.weight,
     )
 
-    if x.selection is not None:
-        newComp.selection = x.selection
-    if x.transformation is not None:
-        newComp.transformation = x.transformation
     return newComp
 
 @preprocess.register

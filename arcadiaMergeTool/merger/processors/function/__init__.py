@@ -16,10 +16,9 @@ from arcadiaMergeTool.merger.processors._processor import (
 from arcadiaMergeTool.merger.processors.helpers import getDestParent
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
-from . import allocation, port, realization
+from . import port, realization
 
 __all__ = [
-    "allocation",
     "port",
     "realization"
 ]

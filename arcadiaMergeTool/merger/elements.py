@@ -15,6 +15,7 @@ from arcadiaMergeTool.helpers.types import (
     ModelElement_co,
 )
 from arcadiaMergeTool.merger.processors import doProcess
+from arcadiaMergeTool.merger.processors._processor import Postponed
 from arcadiaMergeTool.models.capellaModel import CapellaMergeModel
 
 LOGGER = getLogger(name=__name__)
@@ -69,7 +70,7 @@ def mergeElements(
     :type elementMappingMap: MergerElementMappingMap
     """
 
-    LOGGER.info(f"[{mergeElements.__qualname__}] begin merging models into target model")
+    LOGGER.info("[%s] begin merging models into target model", mergeElements.__qualname__)
 
     stats: list[int] = []
     stats2: dict[str, int] = {}
@@ -77,7 +78,7 @@ def mergeElements(
     for model in src:
         lst: deque[ModelElement | tuple[ModelElement, int]] = _makeModelElementList(model) # pyright: ignore[reportAssignmentType] TODO: add contravatiant
 
-        logger.info(f"[{mergeElements.__qualname__}] Start merge of source model [%s], uuid [%s] content", model.model.name, model.model.uuid)
+        LOGGER.info("[%s] Start merge of source model [%s], uuid [%s] content", mergeElements.__qualname__, model.model.name, model.model.uuid)
         while lst:
             elem = lst.pop()
             counter = 1
@@ -98,23 +99,23 @@ def mergeElements(
             if counter > 25:
                 # TODO: make configurable, sometimes it takes up to 20 retries to complete merge
                 if isinstance(elem, mm.modellingcore.AbstractNamedElement):
-                    LOGGER.fatal(f"[{mergeElements.__qualname__}] Processing retry threshold exceeded [%s], element name [%s], uuid [%s], class [%s], model [%s]; queue length [%s]", counter, elem.name, elem.uuid, elem.__class__, elem._model.name, len(lst)) # type: ignore
+                    LOGGER.fatal("[%s] Processing retry threshold exceeded [%s], element name [%s], uuid [%s], class [%s], model [%s]; queue length [%s]", mergeElements.__qualname__, counter, elem.name, elem.uuid, elem.__class__, elem._model.name, len(lst))
                 else:
-                    LOGGER.fatal(f"[{mergeElements.__qualname__}] Processing retry threshold exceeded [%s], element uuid [%s], class [%s], model [%s]; queue length [%s]", counter, elem.uuid, elem.__class__, elem._model.name, len(lst)) # type: ignore
+                    LOGGER.fatal("[%s] Processing retry threshold exceeded [%s], element uuid [%s], class [%s], model [%s]; queue length [%s]", mergeElements.__qualname__, counter, elem.uuid, elem.__class__, elem._model.name, len(lst))
                 sys.exit(str(ExitCodes.MergeFault))
 
             if isinstance(elem, mm.modellingcore.AbstractNamedElement):
-                LOGGER.debug(f"[{mergeElements.__qualname__}] Process element name [%s], uuid [%s], class [%s], model [%s]; queue length [%s], try [%s]", elem.name, elem.uuid, elem.__class__, elem._model.name, len(lst), counter) # type: ignore
+                LOGGER.debug("[%s] Process element name [%s], uuid [%s], class [%s], model [%s]; queue length [%s], try [%s]", mergeElements.__qualname__, elem.name, elem.uuid, elem.__class__, elem._model.name, len(lst), counter)
             else:
-                LOGGER.debug(f"[{mergeElements.__qualname__}] Process element uuid [%s], class [%s], model [%s]; queue length [%s], try [%s]", elem.uuid, elem.__class__, elem._model.name, len(lst), counter) # type: ignore
+                LOGGER.debug("[%s] Process element uuid [%s], class [%s], model [%s]; queue length [%s], try [%s]", mergeElements.__qualname__, elem.uuid, elem.__class__, elem._model.name, len(lst), counter)
             res = doProcess(elem, dest, model, base, mapping)
-            if not res:
+            if res == Postponed:
                 if isinstance(elem, mm.modellingcore.AbstractNamedElement):
-                    LOGGER.debug(f"[{mergeElements.__qualname__}] element name [%s], uuid [%s], class [%s], model [%s] put back to queue", elem.name, elem.uuid, elem.__class__, elem._model.name) # type: ignore
+                    LOGGER.debug("[%s] element name [%s], uuid [%s], class [%s], model [%s] put back to queue", mergeElements.__qualname__, elem.name, elem.uuid, elem.__class__, elem._model.name)
                 else:
-                    LOGGER.debug(f"[{mergeElements.__qualname__}] element uuid [%s], class [%s], model [%s] put back to queue", elem.uuid, elem.__class__, elem._model.name) # type: ignore
+                    LOGGER.debug("[%s] element uuid [%s], class [%s], model [%s] put back to queue", mergeElements.__qualname__, elem.uuid, elem.__class__, elem._model.name)
                 lst.appendleft((elem, counter+1))
 
-        logger.info(f"[{mergeElements.__qualname__}] Merge of source model [%s], uuid [%s] content completed", model.model.name, model.model.uuid)
+        LOGGER.info("[%s] Merge of source model [%s], uuid [%s] content completed", mergeElements.__qualname__, model.model.name, model.model.uuid)
 
-    logger.info(f"[{mergeElements.__qualname__}] Elements merge complete, retries [%s], [%s]", stats, stats2)
+    LOGGER.info("[%s] Elements merge complete, retries [%s], [%s]", mergeElements.__qualname__, stats, stats2)

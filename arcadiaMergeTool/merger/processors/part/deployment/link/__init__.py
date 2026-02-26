@@ -8,6 +8,8 @@ Part Deployment Link checks if either
 In both cases - iterate through the linkss and match them by name
 """
 
+import sys
+
 import capellambse.metamodel as mm
 import capellambse.model as m
 from capellambse import helpers
@@ -39,8 +41,8 @@ def _(x: T,
     coll: m.ElementList[T],
     mapping: MergerElementMappingMap
 ):
-    sourcePartDeploymentLinkMap = mapping.get((x.deployed_element.parent._model.uuid, x.deployed_element.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect source exists in this context
-    targetPartDeploymentLinkMap = mapping.get((x.location.parent._model.uuid, x.location.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect target exists in this context
+    sourcePartDeploymentLinkMap = mapping.get((x._model.uuid, x.deployed_element.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect source exists in this context
+    targetPartDeploymentLinkMap = mapping.get((x._model.uuid, x.location.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect target exists in this context
     sourcePartDeploymentLink = sourcePartDeploymentLinkMap[0] if sourcePartDeploymentLinkMap is not None else None
     targetPartDeploymentLink = targetPartDeploymentLinkMap[0] if targetPartDeploymentLinkMap is not None else None
 
@@ -83,8 +85,8 @@ def _(x: T,
 
 @clone.register
 def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
-    sourcePartDeploymentLinkMap = mapping.get((x.deployed_element.parent._model.uuid, x.deployed_element.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect source exists in this context
-    targetPartDeploymentLinkMap = mapping.get((x.location.parent._model.uuid, x.location.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect target exists in this context
+    sourcePartDeploymentLinkMap = mapping.get((x._model.uuid, x.deployed_element.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect source exists in this context
+    targetPartDeploymentLinkMap = mapping.get((x._model.uuid, x.location.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect target exists in this context
     sourcePartDeploymentLink = sourcePartDeploymentLinkMap[0] if sourcePartDeploymentLinkMap is not None else None
     targetPartDeploymentLink = targetPartDeploymentLinkMap[0] if targetPartDeploymentLinkMap is not None else None
 
@@ -98,9 +100,9 @@ def _(x: T, coll: m.ElementList[T], mapping: MergerElementMappingMap):
     )
 
     if sourcePartDeploymentLinkMap is not None:
-        newComp.deployed_element = sourcePartDeploymentLink # pyright: ignore[reportAttributeAccessIssue] expect deployed_element exists on model
+        newComp.deployed_element = sourcePartDeploymentLink
     if targetPartDeploymentLinkMap is not None:
-        newComp.location = targetPartDeploymentLink # pyright: ignore[reportAttributeAccessIssue] expect location exists on model
+        newComp.location = targetPartDeploymentLink
     return newComp
 
 @preprocess.register

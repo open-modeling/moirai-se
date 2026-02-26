@@ -41,8 +41,8 @@ def _(x: T,
     _base: CapellaMergeModel,
     mapping: MergerElementMappingMap
 ):
-    sourceComponentMap = mapping.get((x._model.uuid, x.source.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect source exists in this context
-    targetComponentMap = mapping.get((x._model.uuid, x.target.parent.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect target exists in this context
+    sourceComponentMap = mapping.get((x._model.uuid, x.source.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect source exists in this context
+    targetComponentMap = mapping.get((x._model.uuid, x.target.uuid)) # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess] expect target exists in this context
 
     if sourceComponentMap is None or targetComponentMap is None:
         # Fast fail, postpone exchange processing to component existence

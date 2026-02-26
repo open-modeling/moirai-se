@@ -79,7 +79,8 @@ def __findMatchingPort(x: T, targetCollection: m.ElementList[T], _destParent: V,
 @clone.register
 def __createCompoentPort(x: T, targetCollection: m.ElementList[T], _mapping: MergerElementMappingMap) -> T:
     LOGGER.debug(
-        f"[{process.__qualname__}] Create a non-library Physical Port name [%s], uuid [%s], model name [%s], uuid [%s]",
+        "[%s] Create a non-library Physical Port name [%s], uuid [%s], model name [%s], uuid [%s]",
+        clone.__qualname__,
         x.name,
         x.uuid,
         x._model.name,
@@ -138,12 +139,24 @@ def _(x: T,
     postpone = False
     newPort = None
     for ex in x.links:
+        LOGGER.debug("[%s] processing physical link name [%s], uuid [%s], class [%s], port name [%s], uuid [%s], class [%s], model name%s], uuid [%s]",
+            process.__qualname__,
+            ex.name,
+            ex.uuid,
+            ex.__class__,
+            x.name,
+            x.uuid,
+            x.__class__,
+            x._model.name,
+            x._model.uuid,
+        )
         exMap = mapping.get((ex._model.uuid, ex.uuid))
         if exMap is None:
             # for unmapped links - wait until they are merged into the model
             # do not proceed with other links, it will be done in one shot
             LOGGER.debug(
-                f"[{process.__qualname__}] dependent Physical Link is not mapped, link name [%s], uuid [%s], model name [%s], uuid [%s]",
+                "[%s] dependent Physical Link is not mapped, postpone processing, link name [%s], uuid [%s [], model name%s], uuid [%s]",
+                process.__qualname__,
                 ex.name,
                 ex.uuid,
                 x._model.name,
@@ -178,7 +191,8 @@ def _(x: T,
                 if mappedLink.source is None:
                     # sanity check, attempt to set target on port with no source crashes
                     LOGGER.warning(
-                        f"[{process.__qualname__}] Target Physical Port assigned before source, postpone processing to avoid crash. Physical Port name [%s], uuid [%s], link name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
+                        "[%s] Target Physical Port assigned before source, postpone processing to avoid crash. Physical Port name [%s], uuid [%s], link name [%s], uuid [%s], parent name [%s], uuid [%s], model name [%s], uuid [%s]",
+                        process.__qualname__,
                         x.name,
                         x.uuid,
                         mappedLink.name,

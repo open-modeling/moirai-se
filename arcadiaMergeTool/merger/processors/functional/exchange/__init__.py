@@ -111,8 +111,6 @@ def _(x: T, coll: m.ElementList[T], _mapping: MergerElementMappingMap):
 
     if x.selection is not None:
         newComp.selection = x.selection
-    if x.status is not None:
-        newComp.status = x.status
 
     # NOTE: do not assign ports, port assignment logic is in function/port
     # if sourceFunctionPortMap is not None:
