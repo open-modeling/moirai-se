@@ -1,26 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<viewpoint:DAnalysis xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:description="http://www.eclipse.org/sirius/description/1.1.0" xmlns:viewpoint="http://www.eclipse.org/sirius/1.1.0" xsi:schemaLocation="http://www.eclipse.org/sirius/description/1.1.0 http://www.eclipse.org/sirius/1.1.0#//description" uid="_iknJ4NufEfCPatXsWuTglQ" selectedViews="_imSk4NufEfCPatXsWuTglQ _ioK0MNufEfCPatXsWuTglQ _iwH2UNufEfCPatXsWuTglQ _izq5kNufEfCPatXsWuTglQ _i0gnENufEfCPatXsWuTglQ _i0mGoNufEfCPatXsWuTglQ _i1EnwNufEfCPatXsWuTglQ" version="15.4.1.202403191723">
+<viewpoint:DAnalysis xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:description="http://www.eclipse.org/sirius/description/1.1.0" xmlns:viewpoint="http://www.eclipse.org/sirius/1.1.0" xsi:schemaLocation="http://www.eclipse.org/sirius/description/1.1.0 http://www.eclipse.org/sirius/1.1.0#//description" uid="_m_uHsBMgEfGm2pZ6xaQ2Gw" selectedViews="_nchYcBMgEfGm2pZ6xaQ2Gw _ngsGwBMgEfGm2pZ6xaQ2Gw _nqQ5gBMgEfGm2pZ6xaQ2Gw _nrtrABMgEfGm2pZ6xaQ2Gw _nvJZgBMgEfGm2pZ6xaQ2Gw _n1fSEBMgEfGm2pZ6xaQ2Gw _n2G9IBMgEfGm2pZ6xaQ2Gw _n2QHEBMgEfGm2pZ6xaQ2Gw" version="15.4.1.202403191723">
   <semanticResources>emptyModel.afm</semanticResources>
   <semanticResources>emptyModel.capella</semanticResources>
-  <ownedViews xmi:type="viewpoint:DView" uid="_imSk4NufEfCPatXsWuTglQ">
+  <ownedViews xmi:type="viewpoint:DView" uid="_nchYcBMgEfGm2pZ6xaQ2Gw">
     <viewpoint xmi:type="description:Viewpoint" href="platform:/plugin/org.polarsys.kitalpha.ad.integration.sirius/description/ad.odesign#//@ownedViewpoints[name='ad']"/>
   </ownedViews>
-  <ownedViews xmi:type="viewpoint:DView" uid="_ioK0MNufEfCPatXsWuTglQ">
-    <viewpoint xmi:type="description:Viewpoint" href="platform:/plugin/org.polarsys.capella.core.sirius.analysis/description/context.odesign#//@ownedViewpoints[name='System%20Analysis']"/>
-  </ownedViews>
-  <ownedViews xmi:type="viewpoint:DView" uid="_iwH2UNufEfCPatXsWuTglQ">
+  <ownedViews xmi:type="viewpoint:DView" uid="_ngsGwBMgEfGm2pZ6xaQ2Gw">
     <viewpoint xmi:type="description:Viewpoint" href="platform:/plugin/org.polarsys.capella.core.sirius.analysis/description/common.odesign#//@ownedViewpoints[name='Common']"/>
   </ownedViews>
-  <ownedViews xmi:type="viewpoint:DView" uid="_izq5kNufEfCPatXsWuTglQ">
+  <ownedViews xmi:type="viewpoint:DView" uid="_nqQ5gBMgEfGm2pZ6xaQ2Gw">
+    <viewpoint xmi:type="description:Viewpoint" href="platform:/plugin/org.polarsys.capella.core.sirius.analysis/description/oa.odesign#//@ownedViewpoints[name='Operational%20Analysis']"/>
+  </ownedViews>
+  <ownedViews xmi:type="viewpoint:DView" uid="_nrtrABMgEfGm2pZ6xaQ2Gw">
+    <viewpoint xmi:type="description:Viewpoint" href="platform:/plugin/org.polarsys.capella.core.sirius.analysis/description/context.odesign#//@ownedViewpoints[name='System%20Analysis']"/>
+  </ownedViews>
+  <ownedViews xmi:type="viewpoint:DView" uid="_nvJZgBMgEfGm2pZ6xaQ2Gw">
+    <viewpoint xmi:type="description:Viewpoint" href="platform:/plugin/com.thalesgroup.mde.capella.diagramstyler/descriptions/diagramstyler.odesign#//@ownedViewpoints[name='Diagram%20Styler']"/>
+  </ownedViews>
+  <ownedViews xmi:type="viewpoint:DView" uid="_n1fSEBMgEfGm2pZ6xaQ2Gw">
     <viewpoint xmi:type="description:Viewpoint" href="platform:/plugin/org.polarsys.capella.core.sirius.analysis/description/logical.odesign#//@ownedViewpoints[name='Logical%20Architecture']"/>
   </ownedViews>
-  <ownedViews xmi:type="viewpoint:DView" uid="_i0gnENufEfCPatXsWuTglQ">
+  <ownedViews xmi:type="viewpoint:DView" uid="_n2G9IBMgEfGm2pZ6xaQ2Gw">
     <viewpoint xmi:type="description:Viewpoint" href="platform:/plugin/org.polarsys.capella.core.sirius.analysis/description/EPBS.odesign#//@ownedViewpoints[name='EPBS%20architecture']"/>
   </ownedViews>
-  <ownedViews xmi:type="viewpoint:DView" uid="_i0mGoNufEfCPatXsWuTglQ">
+  <ownedViews xmi:type="viewpoint:DView" uid="_n2QHEBMgEfGm2pZ6xaQ2Gw">
     <viewpoint xmi:type="description:Viewpoint" href="platform:/plugin/org.polarsys.capella.core.sirius.analysis/description/physical.odesign#//@ownedViewpoints[name='Physical%20Architecture']"/>
-  </ownedViews>
-  <ownedViews xmi:type="viewpoint:DView" uid="_i1EnwNufEfCPatXsWuTglQ">
-    <viewpoint xmi:type="description:Viewpoint" href="platform:/plugin/org.polarsys.capella.core.sirius.analysis/description/oa.odesign#//@ownedViewpoints[name='Operational%20Analysis']"/>
   </ownedViews>
 </viewpoint:DAnalysis>
